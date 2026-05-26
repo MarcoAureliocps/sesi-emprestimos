@@ -6,7 +6,8 @@ from datetime import datetime
 app = Flask(__name__, static_folder='static')
 CORS(app)
 
-DB = os.path.join(os.path.dirname(__file__), 'sesi.db')
+# No Railway o banco fica em /tmp para ter permissão de escrita
+DB = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'sesi.db'))
 
 def get_db():
     conn = sqlite3.connect(DB)
@@ -190,3 +191,6 @@ if __name__ == '__main__':
     print("  PIN admin: 1234 (altere após o 1º acesso)")
     print("="*50 + "\n")
     app.run(host='0.0.0.0', port=5000, debug=False)
+else:
+    # Garante que o banco é criado quando iniciado pelo gunicorn (Railway)
+    init_db()
