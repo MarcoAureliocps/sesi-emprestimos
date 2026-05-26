@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SESI Sumaré • Controle de Ativos</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root{--bg:#0b0f1a;--sidebar:#0e1422;--card:#131929;--card2:#1a2235;--text:#e2e8f0;--text-sec:#7a8ba8;--accent:#38bdf8;--purple:#a78bfa;--green:#34d399;--red:#f87171;--orange:#fb923c;--yellow:#fbbf24;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--admin:#f59e0b;}
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:"Space Grotesk",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px;}
+        .nav-tabs{display:flex;gap:4px;padding:0 20px;background:var(--sidebar);border-bottom:1px solid var(--border);}
+        .nav-tab{padding:10px 18px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:none;color:var(--text-sec);font-family:"Space Grotesk",sans-serif;border-bottom:2px solid transparent;transition:all .2s;}
+        .nav-tab:hover{color:var(--text);}
+        .nav-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+        .nav-tab.admin-tab.active{color:var(--admin);border-bottom-color:var(--admin);}
+        aside{width:320px;min-width:320px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;}
+        .sidebar-top{padding:20px 20px 0;}
+        .sidebar-body{padding:0 20px 20px;display:flex;flex-direction:column;gap:16px;flex:1;}
+        .logo{display:flex;align-items:center;gap:12px;padding:16px 0 12px;}
+        .logo img{height:40px;width:auto;filter:brightness(1.1);}
+        .divider{height:1px;background:var(--border);}
+        .form-label{font-size:10px;font-weight:700;color:var(--text-sec);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;display:block;}
+        .form-group{display:flex;flex-direction:column;gap:14px;}
+        input,select{width:100%;background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:10px 13px;color:var(--text);font-size:13.5px;font-family:"Space Grotesk",sans-serif;transition:border-color .2s,box-shadow .2s;}
+        input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(56,189,248,.15);}
+        select option{background:#1a2235;}
+        .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+        .mapa-btn{background:none;border:1px dashed var(--border2);color:var(--accent);border-radius:8px;padding:9px;font-size:12px;font-family:"Space Grotesk",sans-serif;cursor:pointer;transition:all .2s;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;}
+        .mapa-btn:hover{background:rgba(56,189,248,.08);border-color:var(--accent);}
+        .btn-primary{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--purple));color:#0b0f1a;font-weight:700;font-size:14px;border:none;border-radius:10px;cursor:pointer;font-family:"Space Grotesk",sans-serif;transition:all .25s;box-shadow:0 6px 20px rgba(56,189,248,.25);letter-spacing:.5px;}
+        .btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(56,189,248,.35);}
+        .btn-admin-primary{background:linear-gradient(135deg,var(--admin),#d97706);box-shadow:0 6px 20px rgba(245,158,11,.25);}
+        .btn-admin-primary:hover{box-shadow:0 10px 24px rgba(245,158,11,.35);}
+        .hint{font-size:11px;color:var(--text-sec);line-height:1.5;}
+        .btn-export{padding:9px 16px;background:var(--card2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;font-family:"Space Grotesk",sans-serif;transition:all .2s;width:100%;text-align:center;}
+        .btn-export:hover{border-color:var(--green);color:var(--green);}
+        main{flex:1;padding:28px 32px;display:flex;flex-direction:column;gap:24px;overflow-y:auto;min-width:0;}
+        .page{display:none;flex-direction:column;gap:24px;flex:1;}
+        .page.active{display:flex;}
+        .page-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;}
+        .page-header h1{font-size:22px;font-weight:700;}
+        .page-header p{font-size:13px;color:var(--text-sec);margin-top:3px;}
+        .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;transition:transform .25s,border-color .25s;}
+        .card:hover{transform:translateY(-3px);border-color:var(--border2);}
+        .card-label{font-size:11px;color:var(--text-sec);font-weight:600;text-transform:uppercase;letter-spacing:.8px;}
+        .card-value{font-size:30px;font-weight:700;margin:6px 0 4px;font-family:"JetBrains Mono",monospace;line-height:1;}
+        .card-sub{font-size:12px;color:var(--text-sec);}
+        .card-bar{height:3px;background:var(--border2);border-radius:99px;margin-top:12px;overflow:hidden;}
+        .card-bar-fill{height:100%;border-radius:99px;transition:width .5s ease;}
+        .section{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 22px;flex:1;}
+        .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+        .section-title{font-size:16px;font-weight:700;}
+        .filter-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+        .filter-btn{padding:6px 14px;border-radius:9999px;font-size:12px;font-weight:600;border:1px solid var(--border2);background:transparent;color:var(--text-sec);cursor:pointer;font-family:"Space Grotesk",sans-serif;transition:all .2s;}
+        .filter-btn.active{background:var(--accent);color:#0b0f1a;border-color:var(--accent);}
+        .search-wrap{position:relative;}
+        .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-sec);pointer-events:none;}
+        .search-input{background:var(--card2);border:1px solid var(--border2);padding:9px 14px 9px 36px;border-radius:9999px;width:240px;color:var(--text);font-size:13px;font-family:"Space Grotesk",sans-serif;}
+        .search-input:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(167,139,250,.15);outline:none;}
+        table{width:100%;border-collapse:collapse;}
+        th{text-align:left;padding:10px 14px;font-size:10px;color:var(--text-sec);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);font-weight:700;}
+        td{padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
+        tr:last-child td{border-bottom:none;}
+        tr:hover td{background:rgba(255,255,255,.02);}
+        tr.row-atrasado td{background:rgba(251,146,60,.04);}
+        .pill{display:inline-block;padding:3px 9px;border-radius:9999px;font-size:11px;font-weight:600;}
+        .pill-ativo{background:rgba(52,211,153,.15);color:var(--green);}
+        .pill-devolvido{background:rgba(100,116,139,.15);color:#64748b;}
+        .pill-atrasado{background:rgba(251,146,60,.2);color:var(--orange);}
+        .device-pill{display:inline-block;background:rgba(56,189,248,.1);color:var(--accent);padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;margin:2px;font-family:"JetBrains Mono",monospace;}
+        .carrinho-tag{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+        .tag-preto{background:rgba(167,139,250,.15);color:var(--purple);}
+        .tag-vermelho{background:rgba(248,113,113,.15);color:var(--red);}
+        .tag-cinza{background:rgba(148,163,184,.15);color:#94a3b8;}
+        .tempo-badge{font-size:11px;color:var(--text-sec);font-family:"JetBrains Mono",monospace;}
+        .tempo-badge.atrasado{color:var(--orange);font-weight:700;}
+        .btn-return{background:rgba(52,211,153,.15);color:var(--green);padding:7px 14px;border-radius:7px;font-size:12px;font-weight:700;border:1px solid rgba(52,211,153,.3);cursor:pointer;font-family:"Space Grotesk",sans-serif;transition:all .2s;}
+        .btn-return:hover{background:rgba(52,211,153,.25);transform:scale(1.04);}
+        .btn-delete{background:none;color:#475569;padding:7px 10px;border-radius:7px;font-size:16px;border:1px solid transparent;cursor:pointer;transition:all .2s;line-height:1;}
+        .btn-delete:hover{color:var(--red);border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.08);}
+        .empty-state{text-align:center;padding:48px 20px;color:var(--text-sec);display:none;}
+        .empty-state .icon{font-size:36px;margin-bottom:12px;}
+        .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);align-items:center;justify-content:center;z-index:1000;padding:20px;}
+        .modal.open{display:flex;}
+        .modal-box{background:#131929;border:1px solid var(--border2);border-radius:16px;padding:28px;width:100%;max-width:460px;animation:slideIn .2s ease;}
+        @keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+        .modal-title{font-size:17px;font-weight:700;margin-bottom:6px;}
+        .modal-sub{font-size:13px;color:var(--text-sec);margin-bottom:18px;}
+        .modal-info-box{background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.8;margin-bottom:20px;}
+        .modal-btns{display:flex;gap:10px;}
+        .modal-btns button{flex:1;padding:12px;border-radius:9px;font-weight:700;cursor:pointer;font-family:"Space Grotesk",sans-serif;font-size:13px;}
+        .btn-cancel{background:var(--card2);color:var(--text);border:1px solid var(--border2);}
+        .btn-confirm-green{background:var(--green);color:#0b0f1a;border:none;}
+        .btn-confirm-red{background:var(--red);color:white;border:none;}
+        .btn-confirm-amber{background:var(--admin);color:#0b0f1a;border:none;}
+        .pin-display{display:flex;gap:10px;justify-content:center;margin:20px 0;}
+        .pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border2);transition:all .2s;}
+        .pin-dot.filled{background:var(--admin);border-color:var(--admin);box-shadow:0 0 8px rgba(245,158,11,.5);}
+        .pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:220px;margin:0 auto;}
+        .pin-btn{padding:14px;border-radius:10px;background:var(--card2);border:1px solid var(--border2);color:var(--text);font-size:18px;font-weight:700;cursor:pointer;font-family:"JetBrains Mono",monospace;transition:all .15s;}
+        .pin-btn:hover{background:rgba(245,158,11,.1);border-color:var(--admin);color:var(--admin);}
+        .pin-btn:active{transform:scale(.93);}
+        .pin-btn.del{font-size:14px;color:var(--red);}
+        .pin-error{color:var(--red);font-size:12px;text-align:center;margin-top:8px;min-height:18px;}
+        .mapa-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:6px;margin-top:14px;}
+        .mapa-cell{height:38px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:"JetBrains Mono",monospace;font-size:12px;font-weight:600;border:1px solid;cursor:default;transition:transform .15s;}
+        .mapa-cell:hover{transform:scale(1.08);}
+        .mapa-livre{background:rgba(52,211,153,.1);color:var(--green);border-color:rgba(52,211,153,.25);}
+        .mapa-ocupado{background:rgba(248,113,113,.12);color:var(--red);border-color:rgba(248,113,113,.25);}
+        .mapa-legenda{display:flex;gap:16px;font-size:11px;color:var(--text-sec);margin-top:10px;}
+        .mapa-legenda span{display:flex;align-items:center;gap:6px;}
+        .dot{width:8px;height:8px;border-radius:50%;}
+        .dot-verde{background:var(--green);}
+        .dot-red{background:var(--red);}
+        .mapa-tabs{display:flex;gap:6px;margin-bottom:4px;}
+        .mapa-tab{padding:6px 14px;border-radius:9999px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:none;color:var(--text-sec);font-family:"Space Grotesk",sans-serif;transition:all .15s;}
+        .mapa-tab.active{background:var(--accent);color:#0b0f1a;border-color:var(--accent);}
+        .admin-banner{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:12px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--admin);font-weight:600;}
+        .admin-sidebar-header{font-size:12px;font-weight:700;color:var(--admin);text-transform:uppercase;letter-spacing:1px;}
+        .rel-stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
+        .rel-stat{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+        .rel-stat-val{font-size:24px;font-weight:700;font-family:"JetBrains Mono",monospace;}
+        .rel-stat-lbl{font-size:11px;color:var(--text-sec);margin-top:3px;}
+        .toast{position:fixed;bottom:28px;right:28px;background:#1a2235;border:1px solid var(--border2);border-radius:12px;padding:14px 20px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;z-index:2000;transform:translateY(100px);opacity:0;transition:all .35s cubic-bezier(.34,1.56,.64,1);min-width:240px;box-shadow:0 8px 32px rgba(0,0,0,.4);}
+        .toast.show{transform:translateY(0);opacity:1;}
+        .toast.success{border-color:rgba(52,211,153,.4);}
+        .toast.error{border-color:rgba(248,113,113,.4);}
+        .toast.warn{border-color:rgba(245,158,11,.4);}
+        ::-webkit-scrollbar{width:5px;}
+        ::-webkit-scrollbar-track{background:transparent;}
+        ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:99px;}
+        .alerta-atrasado{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--orange);background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);padding:2px 8px;border-radius:9999px;margin-left:6px;}
+        .turma-badge{font-size:11px;color:var(--text-sec);background:var(--card2);padding:2px 7px;border-radius:5px;display:inline-block;margin-top:2px;}
+        .tipo-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;display:inline-block;}
+        .tipo-prof{background:rgba(56,189,248,.12);color:var(--accent);}
+        .tipo-aluno{background:rgba(167,139,250,.12);color:var(--purple);}
+        .conn-status{font-size:11px;display:flex;align-items:center;gap:5px;}
+        .conn-dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+        .conn-dot.off{background:var(--red);}
+    </style>
+</head>
+<body>
+<aside>
+    <div class="sidebar-top">
+        <div class="logo"><img src="data:image/png;base64,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" alt="SESI Sumaré"></div>
+        <div class="divider"></div>
+    </div>
+    <div class="nav-tabs">
+        <button class="nav-tab active" id="tab-normal" onclick="mudarAba('normal')">📋 Retirada</button>
+        <button class="nav-tab admin-tab" id="tab-admin" onclick="solicitarAdmin()">🔐 Admin</button>
+        <button class="nav-tab" id="tab-rel" onclick="mudarAba('rel')">📊 Relatório</button>
+    </div>
+
+    <!-- NORMAL -->
+    <div class="sidebar-body" id="sidebar-normal">
+        <div style="font-size:12px;font-weight:700;color:var(--text-sec);text-transform:uppercase;letter-spacing:1px;">Nova Retirada — Professor</div>
+        <div class="form-group">
+            <div><label class="form-label">Nome do Professor</label><input type="text" id="nome" placeholder="Ex: Prof. Ana Clara" autocomplete="off"></div>
+            <div class="row2">
+                <div><label class="form-label">NIF / RA</label><input type="text" id="nif" placeholder="NIF87623" autocomplete="off"></div>
+                <div><label class="form-label">Turma / Sala</label><input type="text" id="turma" placeholder="Ex: 3A" autocomplete="off"></div>
+            </div>
+            <div><label class="form-label">Equipamento</label>
+                <select id="equipamento">
+                    <option value="preto">🖥️ Notebook — Preto (1-35)</option>
+                    <option value="vermelho">🖥️ Notebook — Vermelho (1-35)</option>
+                    <option value="cinza">📱 Celular — Cinza (1-16)</option>
+                </select>
+            </div>
+            <div><label class="form-label">Números dos Dispositivos</label><input type="text" id="numeros" placeholder="Ex: 4, 8, 15" autocomplete="off"><p class="hint" style="margin-top:5px;">Separe por vírgula</p></div>
+            <div><label class="form-label">Devolução Prevista (opcional)</label><input type="datetime-local" id="previsao"></div>
+            <div><label class="form-label">Observação (opcional)</label><input type="text" id="obs" placeholder="Ex: aula de reforço"></div>
+            <button class="mapa-btn" onclick="abrirMapa(document.getElementById('equipamento').value)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                Ver Mapa do Carrinho
+            </button>
+            <button class="btn-primary" onclick="registrar('professor')">Registrar Retirada</button>
+        </div>
+    </div>
+
+    <!-- ADMIN -->
+    <div class="sidebar-body" id="sidebar-admin" style="display:none;">
+        <div class="admin-banner">🔐 Modo Administrador Ativo</div>
+        <div class="admin-sidebar-header">Lançamento — Aluno</div>
+        <div class="form-group">
+            <div><label class="form-label">Nome do Aluno</label><input type="text" id="a-nome" placeholder="Ex: João Silva" autocomplete="off"></div>
+            <div class="row2">
+                <div><label class="form-label">RA / Matrícula</label><input type="text" id="a-ra" placeholder="RA2024001" autocomplete="off"></div>
+                <div><label class="form-label">Turma / Sala</label><input type="text" id="a-turma" placeholder="Ex: 2B" autocomplete="off"></div>
+            </div>
+            <div><label class="form-label">Equipamento</label>
+                <select id="a-equip">
+                    <option value="preto">🖥️ Notebook — Preto (1-35)</option>
+                    <option value="vermelho">🖥️ Notebook — Vermelho (1-35)</option>
+                    <option value="cinza">📱 Celular — Cinza (1-16)</option>
+                </select>
+            </div>
+            <div><label class="form-label">Números dos Dispositivos</label><input type="text" id="a-numeros" placeholder="Ex: 3, 7" autocomplete="off"></div>
+            <div><label class="form-label">Devolução Prevista (opcional)</label><input type="datetime-local" id="a-previsao"></div>
+            <div><label class="form-label">Observação (opcional)</label><input type="text" id="a-obs" placeholder="Ex: empréstimo extra"></div>
+            <button class="mapa-btn" onclick="abrirMapa(document.getElementById('a-equip').value)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                Ver Mapa do Carrinho
+            </button>
+            <button class="btn-primary btn-admin-primary" onclick="registrar('aluno')">⚡ Lançar Empréstimo</button>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-export" onclick="abrirAlterarPin()">🔑 Alterar PIN</button>
+                <button class="btn-export" onclick="sairAdmin()">Sair Admin</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- REL -->
+    <div class="sidebar-body" id="sidebar-rel" style="display:none;">
+        <div style="font-size:12px;font-weight:700;color:var(--text-sec);text-transform:uppercase;letter-spacing:1px;">Filtros do Relatório</div>
+        <div class="form-group">
+            <div><label class="form-label">Data Início</label><input type="date" id="rel-inicio"></div>
+            <div><label class="form-label">Data Fim</label><input type="date" id="rel-fim"></div>
+            <div><label class="form-label">Tipo de Usuário</label>
+                <select id="rel-tipo"><option value="todos">Todos</option><option value="professor">Professor</option><option value="aluno">Aluno</option></select>
+            </div>
+            <div><label class="form-label">Carrinho</label>
+                <select id="rel-carrinho"><option value="todos">Todos</option><option value="preto">Preto</option><option value="vermelho">Vermelho</option><option value="cinza">Cinza</option></select>
+            </div>
+            <div><label class="form-label">Status</label>
+                <select id="rel-status"><option value="todos">Todos</option><option value="ativo">Em aberto</option><option value="devolvido">Devolvido</option></select>
+            </div>
+            <button class="btn-primary" onclick="gerarRelatorio()">🔍 Gerar Relatório</button>
+            <button class="btn-export" onclick="exportarRelPDF()">📄 Exportar PDF</button>
+            <button class="btn-export" onclick="exportarCSV()">⬇ Exportar CSV</button>
+        </div>
+    </div>
+</aside>
+
+<main>
+    <!-- PAGE NORMAL -->
+    <div class="page active" id="page-normal">
+        <div class="page-header">
+            <div>
+                <h1>Controle de Empréstimos</h1>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+                    <p id="ultimo-update" style="font-size:13px;color:var(--text-sec);">Conectando...</p>
+                    <span class="conn-status"><span class="conn-dot off" id="conn-dot"></span><span id="conn-label">offline</span></span>
+                </div>
+            </div>
+        </div>
+        <div class="cards">
+            <div class="card"><div class="card-label">⚡ Ativos Agora</div><div class="card-value" id="val-ativos" style="color:var(--accent)">0</div><div class="card-sub">empréstimos em aberto</div></div>
+            <div class="card"><div class="card-label">⚠️ Com Atraso</div><div class="card-value" id="val-atrasados" style="color:var(--orange)">0</div><div class="card-sub">passaram da previsão</div></div>
+            <div class="card"><div class="card-label">📦 Preto</div><div class="card-value" id="val-preto" style="color:var(--purple)">35<small style="font-size:16px;color:var(--text-sec)">/35</small></div><div class="card-sub">Em uso: <strong id="usados-preto" style="color:var(--purple)">0</strong></div><div class="card-bar"><div class="card-bar-fill" id="bar-preto" style="width:0%;background:var(--purple)"></div></div></div>
+            <div class="card"><div class="card-label">📦 Vermelho</div><div class="card-value" id="val-vermelho" style="color:var(--red)">35<small style="font-size:16px;color:var(--text-sec)">/35</small></div><div class="card-sub">Em uso: <strong id="usados-vermelho" style="color:var(--red)">0</strong></div><div class="card-bar"><div class="card-bar-fill" id="bar-vermelho" style="width:0%;background:var(--red)"></div></div></div>
+            <div class="card"><div class="card-label">📱 Cinza</div><div class="card-value" id="val-cinza" style="color:#94a3b8">16<small style="font-size:16px;color:var(--text-sec)">/16</small></div><div class="card-sub">Em uso: <strong id="usados-cinza" style="color:#94a3b8">0</strong></div><div class="card-bar"><div class="card-bar-fill" id="bar-cinza" style="width:0%;background:#94a3b8"></div></div></div>
+        </div>
+        <div class="section">
+            <div class="section-header">
+                <div class="filter-row">
+                    <span class="section-title">Empréstimos</span>
+                    <button onclick="toggleFiltro('ativos')" class="filter-btn active" id="btn-ativos">Ativos</button>
+                    <button onclick="toggleFiltro('todos')" class="filter-btn" id="btn-todos">Histórico</button>
+                    <button onclick="toggleFiltro('devolvidos')" class="filter-btn" id="btn-devolvidos">Devolvidos</button>
+                </div>
+                <div class="search-wrap">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="busca" placeholder="Nome, NIF/RA, turma..." class="search-input" oninput="renderTabela()">
+                </div>
+            </div>
+            <table><thead><tr><th>Responsável / Tipo</th><th>Carrinho</th><th>Dispositivos</th><th>Retirada</th><th>Prev / Tempo</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tabela-corpo"></tbody></table>
+            <div class="empty-state" id="tabela-vazia"><div class="icon">📋</div><p>Nenhum registro encontrado.</p></div>
+        </div>
+    </div>
+
+    <!-- PAGE ADMIN -->
+    <div class="page" id="page-admin">
+        <div class="page-header"><div><h1>🔐 Painel Administrativo</h1><p>Lançamentos manuais de alunos</p></div></div>
+        <div class="admin-banner">⚡ Modo admin ativo — lançamentos marcados como <strong>Admin</strong> no histórico.</div>
+        <div class="section">
+            <div class="section-header">
+                <div class="filter-row">
+                    <span class="section-title">Registros de Alunos</span>
+                    <button onclick="toggleFiltroAdmin('ativos')" class="filter-btn active" id="abtn-ativos">Ativos</button>
+                    <button onclick="toggleFiltroAdmin('todos')" class="filter-btn" id="abtn-todos">Todos</button>
+                </div>
+                <div class="search-wrap">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="busca-admin" placeholder="Nome, RA, turma..." class="search-input" oninput="renderTabelaAdmin()">
+                </div>
+            </div>
+            <table><thead><tr><th>Aluno / Turma</th><th>Carrinho</th><th>Dispositivos</th><th>Retirada</th><th>Prev / Tempo</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tabela-admin-corpo"></tbody></table>
+            <div class="empty-state" id="tabela-admin-vazia"><div class="icon">🎓</div><p>Nenhum lançamento de aluno.</p></div>
+        </div>
+    </div>
+
+    <!-- PAGE RELATÓRIO -->
+    <div class="page" id="page-rel">
+        <div class="page-header"><div><h1>📊 Relatório de Entradas e Saídas</h1><p id="rel-periodo-label">Configure os filtros e clique em Gerar Relatório</p></div></div>
+        <div class="rel-stat-row">
+            <div class="rel-stat"><div class="rel-stat-val" id="rs-total" style="color:var(--accent)">—</div><div class="rel-stat-lbl">Total</div></div>
+            <div class="rel-stat"><div class="rel-stat-val" id="rs-prof" style="color:var(--accent)">—</div><div class="rel-stat-lbl">Professores</div></div>
+            <div class="rel-stat"><div class="rel-stat-val" id="rs-aluno" style="color:var(--purple)">—</div><div class="rel-stat-lbl">Alunos</div></div>
+            <div class="rel-stat"><div class="rel-stat-val" id="rs-dev" style="color:var(--green)">—</div><div class="rel-stat-lbl">Devolvidos</div></div>
+            <div class="rel-stat"><div class="rel-stat-val" id="rs-aberto" style="color:var(--orange)">—</div><div class="rel-stat-lbl">Em aberto</div></div>
+            <div class="rel-stat"><div class="rel-stat-val" id="rs-disp" style="color:var(--yellow)">—</div><div class="rel-stat-lbl">Dispositivos</div></div>
+        </div>
+        <div class="section">
+            <div class="section-header"><span class="section-title">Registros Filtrados</span><span id="rel-count" style="font-size:12px;color:var(--text-sec)"></span></div>
+            <table><thead><tr><th>Responsável</th><th>Tipo</th><th>Turma</th><th>Carrinho</th><th>Dispositivos</th><th>Retirada</th><th>Devolução</th><th>Status</th><th>Obs</th></tr></thead>
+            <tbody id="tabela-rel"></tbody></table>
+            <div class="empty-state" id="tabela-rel-vazia"><div class="icon">🔍</div><p>Gere um relatório usando os filtros ao lado.</p></div>
+        </div>
+    </div>
+</main>
+
+<!-- MODAIS -->
+<div class="modal" id="modal-pin">
+    <div class="modal-box" style="max-width:340px;text-align:center;">
+        <div class="modal-title">🔐 Acesso Administrativo</div>
+        <div class="modal-sub">Digite o PIN de 4 dígitos.</div>
+        <div class="pin-display" id="pin-display">
+            <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+            <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+        </div>
+        <div class="pin-pad">
+            <button class="pin-btn" onclick="digitarPin(1)">1</button><button class="pin-btn" onclick="digitarPin(2)">2</button><button class="pin-btn" onclick="digitarPin(3)">3</button>
+            <button class="pin-btn" onclick="digitarPin(4)">4</button><button class="pin-btn" onclick="digitarPin(5)">5</button><button class="pin-btn" onclick="digitarPin(6)">6</button>
+            <button class="pin-btn" onclick="digitarPin(7)">7</button><button class="pin-btn" onclick="digitarPin(8)">8</button><button class="pin-btn" onclick="digitarPin(9)">9</button>
+            <button class="pin-btn del" onclick="apagarPin()">⌫</button><button class="pin-btn" onclick="digitarPin(0)">0</button>
+            <button class="pin-btn del" onclick="fecharModal('modal-pin')">✕</button>
+        </div>
+        <div class="pin-error" id="pin-error"></div>
+    </div>
+</div>
+
+<div class="modal" id="modal-change-pin">
+    <div class="modal-box" style="max-width:380px;">
+        <div class="modal-title">🔑 Alterar PIN Admin</div>
+        <div class="modal-sub">Defina um novo PIN de 4 dígitos.</div>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+            <div><label class="form-label">PIN Atual</label><input type="password" id="pin-atual" placeholder="PIN atual" maxlength="4" style="letter-spacing:4px;font-size:18px;"></div>
+            <div><label class="form-label">Novo PIN</label><input type="password" id="pin-novo" placeholder="Novo PIN" maxlength="4" style="letter-spacing:4px;font-size:18px;"></div>
+            <div><label class="form-label">Confirmar Novo PIN</label><input type="password" id="pin-conf" placeholder="Confirmar" maxlength="4" style="letter-spacing:4px;font-size:18px;"></div>
+        </div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="fecharModal('modal-change-pin')">Cancelar</button>
+            <button class="btn-confirm-amber" onclick="salvarPin()">Salvar PIN</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="modal-devolucao">
+    <div class="modal-box">
+        <div class="modal-title">✅ Confirmar Devolução</div>
+        <div class="modal-sub">Os equipamentos serão marcados como devolvidos.</div>
+        <div class="modal-info-box" id="modal-info"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="fecharModal('modal-devolucao')">Cancelar</button>
+            <button class="btn-confirm-green" onclick="confirmarDevolucao()">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="modal-excluir">
+    <div class="modal-box">
+        <div class="modal-title">🗑️ Excluir Registro</div>
+        <div class="modal-sub">Remove permanentemente do banco de dados.</div>
+        <div class="modal-info-box" id="modal-excluir-info"></div>
+        <div class="modal-btns">
+            <button class="btn-cancel" onclick="fecharModal('modal-excluir')">Cancelar</button>
+            <button class="btn-confirm-red" onclick="confirmarExclusao()">Excluir</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="modal-mapa">
+    <div class="modal-box" style="max-width:500px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div class="modal-title">🗺️ Mapa de Disponibilidade</div>
+            <button onclick="fecharModal('modal-mapa')" style="background:none;border:none;color:var(--text-sec);font-size:20px;cursor:pointer;line-height:1;">×</button>
+        </div>
+        <div class="mapa-tabs" id="mapa-tabs">
+            <button class="mapa-tab active" onclick="mostrarMapa('preto',this)">Preto</button>
+            <button class="mapa-tab" onclick="mostrarMapa('vermelho',this)">Vermelho</button>
+            <button class="mapa-tab" onclick="mostrarMapa('cinza',this)">Cinza</button>
+        </div>
+        <div class="mapa-grid" id="mapa-grid"></div>
+        <div class="mapa-legenda"><span><div class="dot dot-verde"></div> Disponível</span><span><div class="dot dot-red"></div> Emprestado</span></div>
+        <div id="mapa-resumo" style="font-size:12px;color:var(--text-sec);margin-top:10px;"></div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const MAXIMOS={preto:35,vermelho:35,cinza:16};
+const HORAS_ALERTA=4;
+let todosEmprestimos=[];
+let dispositivosAtivos={preto:[],vermelho:[],cinza:[]};
+let filtroAtual='ativos';
+let filtroAdminAtual='ativos';
+let adminLogado=false;
+let pinBuffer='';
+let idParaDevolver=null;
+let idParaExcluir=null;
+let relFiltrados=[];
+
+// ── API ──
+async function api(url,opts={}){
+    try{
+        const r=await fetch(url,{headers:{'Content-Type':'application/json'},...opts});
+        return await r.json();
+    }catch(e){setConexao(false);return null;}
+}
+
+function setConexao(ok){
+    document.getElementById('conn-dot').className='conn-dot'+(ok?'':' off');
+    document.getElementById('conn-label').textContent=ok?'online':'offline';
+}
+
+async function carregarDados(){
+    const [emp,disp]=await Promise.all([
+        api('/api/emprestimos'),
+        api('/api/dispositivos-ativos')
+    ]);
+    if(emp!==null&&disp!==null){
+        setConexao(true);
+        todosEmprestimos=emp;
+        dispositivosAtivos=disp;
+        renderDashboard();
+        renderTabela();
+        if(adminLogado) renderTabelaAdmin();
+        const agora=new Date().toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        document.getElementById('ultimo-update').textContent='Atualizado em '+agora;
+    }
+}
+
+// ── DASHBOARD ──
+function renderDashboard(){
+    let ativos=0,atrasados=0;
+    todosEmprestimos.forEach(e=>{
+        if(!e.data_devolucao){ativos++;if(isAtrasado(e))atrasados++;}
+    });
+    document.getElementById('val-ativos').textContent=ativos;
+    document.getElementById('val-atrasados').textContent=atrasados;
+    ['preto','vermelho','cinza'].forEach(cor=>{
+        const usados=(dispositivosAtivos[cor]||[]).length;
+        const max=MAXIMOS[cor];
+        document.getElementById('val-'+cor).innerHTML=(max-usados)+'<small style="font-size:16px;color:var(--text-sec)">\/'+max+'</small>';
+        document.getElementById('usados-'+cor).textContent=usados;
+        document.getElementById('bar-'+cor).style.width=(usados/max*100).toFixed(1)+'%';
+    });
+}
+
+function isAtrasado(emp){
+    if(emp.data_devolucao) return false;
+    if(emp.previsao) return new Date()>new Date(emp.previsao);
+    return Date.now()-new Date(emp.data_emprestimo).getTime()>HORAS_ALERTA*3600000;
+}
+
+function tempoDecorrido(iso){
+    const ms=Date.now()-new Date(iso).getTime();
+    const min=Math.floor(ms/60000);
+    if(min<60) return min+'min';
+    return Math.floor(min/60)+'h '+(min%60)+'min';
+}
+
+// ── TABELAS ──
+function toggleFiltro(t){
+    filtroAtual=t;
+    ['ativos','todos','devolvidos'].forEach(x=>document.getElementById('btn-'+x).classList.toggle('active',x===t));
+    renderTabela();
+}
+
+function toggleFiltroAdmin(t){
+    filtroAdminAtual=t;
+    ['ativos','todos'].forEach(x=>document.getElementById('abtn-'+x).classList.toggle('active',x===t));
+    renderTabelaAdmin();
+}
+
+function renderTabela(){
+    buildTabela(todosEmprestimos,'tabela-corpo','tabela-vazia',filtroAtual,document.getElementById('busca').value.toLowerCase(),null);
+}
+
+function renderTabelaAdmin(){
+    buildTabela(todosEmprestimos,'tabela-admin-corpo','tabela-admin-vazia',filtroAdminAtual,document.getElementById('busca-admin').value.toLowerCase(),'aluno');
+}
+
+function buildTabela(dados,tbodyId,vazioId,filtro,busca,soTipo){
+    const tbody=document.getElementById(tbodyId);
+    const vazia=document.getElementById(vazioId);
+    tbody.innerHTML='';
+    let lista=[...dados];
+    if(soTipo) lista=lista.filter(e=>e.tipo===soTipo);
+    if(filtro==='ativos') lista=lista.filter(e=>!e.data_devolucao);
+    else if(filtro==='devolvidos') lista=lista.filter(e=>e.data_devolucao);
+    if(busca) lista=lista.filter(e=>e.nome.toLowerCase().includes(busca)||e.id.toLowerCase().includes(busca)||(e.turma||'').toLowerCase().includes(busca));
+    if(filtro==='ativos'){
+        lista.sort((a,b)=>{
+            if(isAtrasado(a)&&!isAtrasado(b)) return -1;
+            if(!isAtrasado(a)&&isAtrasado(b)) return 1;
+            return new Date(a.data_emprestimo)-new Date(b.data_emprestimo);
+        });
+    } else {
+        lista.sort((a,b)=>new Date(b.data_emprestimo)-new Date(a.data_emprestimo));
+    }
+    if(lista.length===0){vazia.style.display='block';return;}
+    vazia.style.display='none';
+    lista.forEach(emp=>{
+        const atrasado=isAtrasado(emp);
+        const ativo=!emp.data_devolucao;
+        const dataRet=new Date(emp.data_emprestimo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        let prevCol='';
+        if(ativo){
+            const tempo='<span class="tempo-badge'+(atrasado?' atrasado':'')+'">⏱ '+tempoDecorrido(emp.data_emprestimo)+'</span>';
+            prevCol=emp.previsao?tempo+'<br><span style="font-size:11px;color:'+(atrasado?'var(--orange)':'var(--text-sec)')+'">Prev: '+new Date(emp.previsao).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span>':tempo;
+        } else {
+            prevCol='<span style="font-size:12px;color:var(--text-sec)">Dev: '+new Date(emp.data_devolucao).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span>';
+        }
+        const statusHtml=ativo&&atrasado?'<span class="pill pill-atrasado">⚠ ATRASO</span>':ativo?'<span class="pill pill-ativo">● ATIVO</span>':'<span class="pill pill-devolvido">✓ DEVOLVIDO</span>';
+        const tagClass={preto:'tag-preto',vermelho:'tag-vermelho',cinza:'tag-cinza'}[emp.carrinho];
+        const carLabel={preto:'Preto 🖥️',vermelho:'Vermelho 🖥️',cinza:'Cinza 📱'}[emp.carrinho];
+        const pills=emp.numeros_dispositivos.map(n=>'<span class="device-pill">'+n+'</span>').join('');
+        const tipoClass=emp.tipo==='aluno'?'tipo-aluno':'tipo-prof';
+        const tipoLabel=emp.tipo==='aluno'?'Aluno':'Prof';
+        const acao=ativo?'<button class="btn-return" onclick="abrirDevolver(\''+emp.id+'\')">↩ Devolver</button>':'<button class="btn-delete" onclick="abrirExcluir(\''+emp.id+'\')">🗑</button>';
+        const tr=document.createElement('tr');
+        if(atrasado) tr.className='row-atrasado';
+        tr.innerHTML='<td><strong>'+emp.nome+'</strong>'+(atrasado?'<span class="alerta-atrasado">⚠ ATRASO</span>':'')+'<br><span style="font-size:11px;color:var(--text-sec)">'+emp.id+'</span> <span class="tipo-badge '+tipoClass+'">'+tipoLabel+'</span>'+(emp.turma?'<span class="turma-badge">'+emp.turma+'</span>':'')+(emp.obs?'<br><span style="font-size:11px;color:#64748b;font-style:italic">'+emp.obs+'</span>':'')+'</td><td><span class="carrinho-tag '+tagClass+'">'+carLabel+'</span></td><td>'+pills+'</td><td style="color:var(--text-sec);font-size:12px">'+dataRet+'</td><td>'+prevCol+'</td><td>'+statusHtml+'</td><td>'+acao+'</td>';
+        tbody.appendChild(tr);
+    });
+}
+
+// ── REGISTRAR ──
+async function registrar(tipo){
+    const pref=tipo==='aluno'?'a-':'';
+    const nome=document.getElementById(pref+'nome').value.trim();
+    const nifId=document.getElementById(pref+(tipo==='aluno'?'ra':'nif')).value.trim().toUpperCase();
+    const turma=document.getElementById(pref+'turma').value.trim();
+    const carrinho=document.getElementById(tipo==='aluno'?'a-equip':'equipamento').value;
+    const numerosStr=document.getElementById(pref+'numeros').value.trim();
+    const previsao=document.getElementById(pref+'previsao').value||null;
+    const obs=document.getElementById(pref+'obs').value.trim();
+    if(!nome){showToast('⚠️ Informe o nome.','error');return;}
+    if(!nifId){showToast('⚠️ Informe o NIF/RA.','error');return;}
+    if(!numerosStr){showToast('⚠️ Informe os números.','error');return;}
+    const numeros=numerosStr.split(',').map(n=>parseInt(n.trim())).filter(n=>!isNaN(n));
+    if(!numeros.length){showToast('⚠️ Números inválidos.','error');return;}
+    const r=await api('/api/registrar',{method:'POST',body:JSON.stringify({nome,id:nifId,carrinho,tipo,turma,obs,previsao,numeros_dispositivos:numeros})});
+    if(!r){showToast('❌ Erro de conexão.','error');return;}
+    if(r.erro){showToast('⚠️ '+r.erro,'error');return;}
+    const campos=tipo==='aluno'?['a-nome','a-ra','a-turma','a-numeros','a-previsao','a-obs']:['nome','nif','turma','numeros','previsao','obs'];
+    campos.forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    showToast('✅ '+numeros.length+' dispositivo(s) registrado(s)!','success');
+    await carregarDados();
+}
+
+// ── MODAIS ──
+function abrirDevolver(id){
+    idParaDevolver=id;
+    const emp=todosEmprestimos.find(e=>e.id===id);
+    const pills=emp.numeros_dispositivos.map(n=>'<span class="device-pill">'+n+'</span>').join(' ');
+    document.getElementById('modal-info').innerHTML='<strong>Responsável:</strong> '+emp.nome+' ('+id+')<br>'+(emp.turma?'<strong>Turma:</strong> '+emp.turma+'<br>':'')+'<strong>Carrinho:</strong> '+emp.carrinho.toUpperCase()+'<br><strong>Tempo fora:</strong> '+tempoDecorrido(emp.data_emprestimo)+'<br><br><strong>Dispositivos:</strong><br>'+pills;
+    document.getElementById('modal-devolucao').classList.add('open');
+}
+
+async function confirmarDevolucao(){
+    if(!idParaDevolver) return;
+    const r=await api('/api/devolver/'+idParaDevolver,{method:'PUT'});
+    if(r&&r.ok){await carregarDados();showToast('✅ Devolução registrada!','success');}
+    else showToast('❌ Erro ao devolver.','error');
+    fecharModal('modal-devolucao');
+}
+
+function abrirExcluir(id){
+    idParaExcluir=id;
+    const emp=todosEmprestimos.find(e=>e.id===id);
+    document.getElementById('modal-excluir-info').innerHTML='<strong>Responsável:</strong> '+emp.nome+' ('+id+')<br><strong>Carrinho:</strong> '+emp.carrinho.toUpperCase()+'<br><strong>Dispositivos:</strong> '+emp.numeros_dispositivos.join(', ');
+    document.getElementById('modal-excluir').classList.add('open');
+}
+
+async function confirmarExclusao(){
+    if(!idParaExcluir) return;
+    const r=await api('/api/excluir/'+idParaExcluir,{method:'DELETE'});
+    if(r&&r.ok){await carregarDados();showToast('🗑️ Registro excluído.','error');}
+    fecharModal('modal-excluir');
+}
+
+function fecharModal(id){document.getElementById(id).classList.remove('open');idParaDevolver=null;idParaExcluir=null;}
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)fecharModal(m.id);}));
+
+// ── PIN ──
+function solicitarAdmin(){
+    if(adminLogado){mudarAba('admin');return;}
+    pinBuffer='';atualizarDots();
+    document.getElementById('pin-error').textContent='';
+    document.getElementById('modal-pin').classList.add('open');
+}
+
+async function digitarPin(d){
+    if(pinBuffer.length>=4) return;
+    pinBuffer+=d; atualizarDots();
+    if(pinBuffer.length===4){
+        setTimeout(async()=>{
+            const r=await api('/api/pin/verificar',{method:'POST',body:JSON.stringify({pin:pinBuffer})});
+            if(r&&r.ok){
+                adminLogado=true;
+                fecharModal('modal-pin');
+                mudarAba('admin');
+                showToast('🔐 Acesso admin liberado!','warn');
+            } else {
+                document.getElementById('pin-error').textContent='PIN incorreto. Tente novamente.';
+                pinBuffer=''; atualizarDots();
+            }
+        },200);
+    }
+}
+
+function apagarPin(){pinBuffer=pinBuffer.slice(0,-1);atualizarDots();document.getElementById('pin-error').textContent='';}
+function atualizarDots(){for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('filled',i<pinBuffer.length);}
+
+async function salvarPin(){
+    const atual=document.getElementById('pin-atual').value.trim();
+    const novo=document.getElementById('pin-novo').value.trim();
+    const conf=document.getElementById('pin-conf').value.trim();
+    if(novo!==conf){showToast('⚠️ Os PINs não coincidem.','error');return;}
+    if(!/^\d{4}$/.test(novo)){showToast('⚠️ PIN deve ter 4 dígitos.','error');return;}
+    const r=await api('/api/pin/alterar',{method:'POST',body:JSON.stringify({pin_atual:atual,pin_novo:novo})});
+    if(r&&r.ok){fecharModal('modal-change-pin');['pin-atual','pin-novo','pin-conf'].forEach(id=>document.getElementById(id).value='');showToast('✅ PIN alterado!','success');}
+    else showToast('⚠️ '+(r&&r.erro?r.erro:'Erro'),'error');
+}
+
+function abrirAlterarPin(){document.getElementById('modal-change-pin').classList.add('open');}
+function sairAdmin(){adminLogado=false;mudarAba('normal');showToast('Modo admin encerrado.','warn');}
+
+// ── ABAS ──
+function mudarAba(aba){
+    ['normal','admin','rel'].forEach(a=>{
+        document.getElementById('page-'+a).classList.toggle('active',a===aba);
+        const tb=document.getElementById('tab-'+a);
+        if(tb) tb.classList.toggle('active',a===aba);
+        const sb=document.getElementById('sidebar-'+a);
+        if(sb) sb.style.display=a===aba?'flex':'none';
+    });
+    if(aba==='admin') renderTabelaAdmin();
+    if(aba==='rel') setDefaultDates();
+}
+
+function setDefaultDates(){
+    const hoje=new Date();
+    const ini=new Date(hoje.getFullYear(),hoje.getMonth(),1);
+    document.getElementById('rel-inicio').value=ini.toISOString().split('T')[0];
+    document.getElementById('rel-fim').value=hoje.toISOString().split('T')[0];
+}
+
+// ── MAPA ──
+async function abrirMapa(carrinho){
+    await carregarDados();
+    document.querySelectorAll('.mapa-tab').forEach((b,i)=>b.classList.toggle('active',['preto','vermelho','cinza'][i]===carrinho));
+    mostrarMapa(carrinho||'preto');
+    document.getElementById('modal-mapa').classList.add('open');
+}
+
+function mostrarMapa(carrinho,btn){
+    if(btn){document.querySelectorAll('.mapa-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+    const max=MAXIMOS[carrinho],emp=dispositivosAtivos[carrinho]||[];
+    const grid=document.getElementById('mapa-grid');
+    grid.innerHTML='';
+    for(let i=1;i<=max;i++){
+        const cell=document.createElement('div');
+        cell.className='mapa-cell '+(emp.includes(i)?'mapa-ocupado':'mapa-livre');
+        cell.textContent=i;
+        grid.appendChild(cell);
+    }
+    document.getElementById('mapa-resumo').textContent=(max-emp.length)+' de '+max+' disponíveis · '+emp.length+' emprestados';
+}
+
+// ── RELATÓRIO ──
+function gerarRelatorio(){
+    const ini=document.getElementById('rel-inicio').value;
+    const fim=document.getElementById('rel-fim').value;
+    const tipo=document.getElementById('rel-tipo').value;
+    const carr=document.getElementById('rel-carrinho').value;
+    const stat=document.getElementById('rel-status').value;
+    const dtIni=ini?new Date(ini+'T00:00:00'):null;
+    const dtFim=fim?new Date(fim+'T23:59:59'):null;
+    relFiltrados=todosEmprestimos.filter(emp=>{
+        const dt=new Date(emp.data_emprestimo);
+        if(dtIni&&dt<dtIni) return false;
+        if(dtFim&&dt>dtFim) return false;
+        if(tipo!=='todos'&&emp.tipo!==tipo) return false;
+        if(carr!=='todos'&&emp.carrinho!==carr) return false;
+        if(stat==='ativo'&&emp.data_devolucao) return false;
+        if(stat==='devolvido'&&!emp.data_devolucao) return false;
+        return true;
+    });
+    relFiltrados.sort((a,b)=>new Date(b.data_emprestimo)-new Date(a.data_emprestimo));
+    const total=relFiltrados.length;
+    const prof=relFiltrados.filter(e=>e.tipo==='professor').length;
+    const aluno=relFiltrados.filter(e=>e.tipo==='aluno').length;
+    const dev=relFiltrados.filter(e=>e.data_devolucao).length;
+    const disp=relFiltrados.reduce((s,e)=>s+e.numeros_dispositivos.length,0);
+    document.getElementById('rs-total').textContent=total;
+    document.getElementById('rs-prof').textContent=prof;
+    document.getElementById('rs-aluno').textContent=aluno;
+    document.getElementById('rs-dev').textContent=dev;
+    document.getElementById('rs-aberto').textContent=total-dev;
+    document.getElementById('rs-disp').textContent=disp;
+    document.getElementById('rel-periodo-label').textContent='Período: '+(ini||'início')+' → '+(fim||'hoje')+' · '+total+' registros';
+    document.getElementById('rel-count').textContent=total+' registros';
+    const tbody=document.getElementById('tabela-rel');
+    const vazia=document.getElementById('tabela-rel-vazia');
+    tbody.innerHTML='';
+    if(!relFiltrados.length){vazia.style.display='block';return;}
+    vazia.style.display='none';
+    relFiltrados.forEach(emp=>{
+        const tipoC=emp.tipo==='aluno'?'tipo-aluno':'tipo-prof';
+        const tipoL=emp.tipo==='aluno'?'Aluno':'Prof';
+        const st=emp.data_devolucao?'<span class="pill pill-devolvido" style="font-size:10px">DEVOLVIDO</span>':'<span class="pill pill-ativo" style="font-size:10px">EM ABERTO</span>';
+        const pills=emp.numeros_dispositivos.map(n=>'<span class="device-pill">'+n+'</span>').join('');
+        const tagC={preto:'tag-preto',vermelho:'tag-vermelho',cinza:'tag-cinza'}[emp.carrinho];
+        const devStr=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+        const tr=document.createElement('tr');
+        tr.innerHTML='<td><strong>'+emp.nome+'</strong><br><span style="font-size:11px;color:var(--text-sec)">'+emp.id+'</span></td><td><span class="tipo-badge '+tipoC+'">'+tipoL+'</span></td><td>'+(emp.turma||'—')+'</td><td><span class="carrinho-tag '+tagC+'">'+emp.carrinho.toUpperCase()+'</span></td><td>'+pills+'</td><td style="font-size:12px;color:var(--text-sec)">'+new Date(emp.data_emprestimo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</td><td style="font-size:12px;color:var(--text-sec)">'+devStr+'</td><td>'+st+'</td><td style="font-size:11px;color:#64748b">'+(emp.obs||'—')+'</td>';
+        tbody.appendChild(tr);
+    });
+}
+
+function exportarRelPDF(){
+    if(!relFiltrados.length){showToast('⚠️ Gere o relatório primeiro.','warn');return;}
+    const ini=document.getElementById('rel-inicio').value||'—';
+    const fim=document.getElementById('rel-fim').value||'—';
+    const rows=relFiltrados.map(emp=>{
+        const devStr=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR'):'Em aberto';
+        return '<tr><td>'+emp.nome+'</td><td>'+(emp.tipo||'professor')+'</td><td>'+(emp.turma||'—')+'</td><td>'+emp.carrinho.toUpperCase()+'</td><td>'+emp.numeros_dispositivos.join(', ')+'</td><td>'+new Date(emp.data_emprestimo).toLocaleString('pt-BR')+'</td><td>'+devStr+'</td><td>'+(emp.data_devolucao?'Devolvido':'Em aberto')+'</td></tr>';
+    }).join('');
+    const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório SESI Sumaré</title><style>body{font-family:Arial,sans-serif;padding:24px;font-size:12px}h1{font-size:18px;margin-bottom:4px}p.sub{color:#555;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#222;color:#fff;padding:8px 10px;text-align:left;font-size:11px}td{padding:7px 10px;border-bottom:1px solid #e5e7eb;font-size:11px}@media print{button{display:none}}</style></head><body><h1>Relatório SESI Sumaré — Controle de Ativos</h1><p class="sub">Período: '+ini+' → '+fim+' · '+relFiltrados.length+' registros · Gerado em '+new Date().toLocaleString('pt-BR')+'</p><table><thead><tr><th>Nome</th><th>Tipo</th><th>Turma</th><th>Carrinho</th><th>Dispositivos</th><th>Retirada</th><th>Devolução</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></body></html>';
+    const w=window.open('','_blank');
+    w.document.write(html);w.document.close();
+    setTimeout(()=>w.print(),400);
+    showToast('📄 PDF aberto!','success');
+}
+
+function exportarCSV(){
+    const dados=relFiltrados.length>0?relFiltrados:todosEmprestimos;
+    const linhas=['Nome,RA/NIF,Tipo,Turma,Carrinho,Dispositivos,Data Retirada,Data Devolução,Obs'];
+    dados.forEach(emp=>{
+        const dev=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR'):'Em aberto';
+        linhas.push(['"'+emp.nome+'"',emp.id,emp.tipo||'professor','"'+(emp.turma||'')+'"',emp.carrinho,'"'+emp.numeros_dispositivos.join(', ')+'"','"'+new Date(emp.data_emprestimo).toLocaleString('pt-BR')+'"','"'+dev+'"','"'+(emp.obs||'')+'"'].join(','));
+    });
+    const blob=new Blob(['\uFEFF'+linhas.join('\n')],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='relatorio_sesi_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.csv';
+    a.click();
+    showToast('📊 CSV exportado!','success');
+}
+
+// ── TOAST ──
+function showToast(msg,type='success'){
+    const t=document.getElementById('toast');
+    t.textContent=msg;t.className='toast '+type+' show';
+    setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// ── INIT ──
+setDefaultDates();
+carregarDados();
+setInterval(carregarDados,30000);
+</script>
+</body>
+</html>
