@@ -80,7 +80,7 @@ def registrar():
     if not nome or not id_ or not numeros:
         return jsonify({'erro':'Campos obrigatórios faltando'}), 400
 
-    MAXIMOS = {'preto':35,'vermelho':35,'cinza':16}
+    MAXIMOS = {'preto':35,'vermelho':35,'cinza':16,'jbl':1}
     max_n = MAXIMOS.get(carrinho, 35)
     for n in numeros:
         if not isinstance(n,int) or n < 1 or n > max_n:
@@ -150,8 +150,9 @@ def dispositivos_ativos():
     conn.close()
     resultado = {'preto':[],'vermelho':[],'cinza':[]}
     for r in rows:
-        nums = json.loads(r['dispositivos'])
-        resultado[r['carrinho']].extend(nums)
+        if r['carrinho'] in resultado:
+            nums = json.loads(r['dispositivos'])
+            resultado[r['carrinho']].extend(nums)
     return jsonify(resultado)
 
 # ── API: PIN ─────────────────────────────────────────
