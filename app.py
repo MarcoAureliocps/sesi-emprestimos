@@ -43,6 +43,10 @@ def init_db():
 def index():
     return send_from_directory('static', 'index.html')
 
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory('static', filename)
+
 # ── API: EMPRÉSTIMOS ──────────────────────────────────
 @app.route('/api/emprestimos', methods=['GET'])
 def listar_emprestimos():
