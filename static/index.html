@@ -1186,153 +1186,161 @@ tbody tr.row-late td { background:rgba(245,158,11,.02); }
      JAVASCRIPT
 ═══════════════════════════ -->
 <script>
-/* ── ESTADO GLOBAL ── */
-const MAXIMOS = { preto:35, vermelho:35, cinza:16 };
-const HORAS_ALERTA = 4;
+var MAXIMOS = { preto: 35, vermelho: 35, cinza: 16 };
+var HORAS_ALERTA = 4;
 
-let state = {
-  emprestimos: [],
-  dispAtivos: { preto:[], vermelho:[], cinza:[] },
-  jblAtivo: null,
-  equipAtual: 'preto',
-  selSlots: new Set(),
-  adminLogado: false,
-  pinBuf: '',
-  idDevolver: null,
-  idExcluir: null,
-  filtroP: 'ativos',
-  filtroA: 'ativos',
-  relData: [],
-  pendRetirada: null,
+var S = {
+  emp: [], disp: { preto:[], vermelho:[], cinza:[] },
+  jblAtivo: null, equip: 'preto', sel: {},
+  adminOn: false, pinBuf: '',
+  idDev: null, idEx: null,
+  pFiltro: 'ativos', aFiltro: 'ativos',
+  relData: [], pendRet: null
 };
 
-/* ── CLOCK ── */
-function tickClock() {
-  const now = new Date();
-  document.getElementById('clock').textContent =
-    now.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-}
-setInterval(tickClock, 1000); tickClock();
+function selHas(n) { return S.sel[n] === true; }
+function selAdd(n) { S.sel[n] = true; }
+function selDel(n) { delete S.sel[n]; }
+function selClear() { S.sel = {}; }
+function selSize() { return Object.keys(S.sel).length; }
+function selArr() { return Object.keys(S.sel).map(Number); }
 
-/* ── API ── */
-async function api(url, opts={}) {
-  try {
-    const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
-    setOnline(true);
-    return await r.json();
-  } catch(e) { setOnline(false); return null; }
+/* CLOCK */
+setInterval(function() {
+  var n = new Date();
+  var el = document.getElementById('clock');
+  if (el) el.textContent = n.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}, 1000);
+
+/* LOGO */
+fetch('/static/logo_b64.txt').then(function(r){return r.text();}).then(function(t){
+  var img = document.getElementById('logo-img');
+  if(img) img.src = 'data:image/png;base64,' + t.trim();
+}).catch(function(){});
+
+/* API */
+function api(url, opts) {
+  opts = opts || {};
+  return fetch(url, Object.assign({headers:{'Content-Type':'application/json'}}, opts))
+    .then(function(r){ setOnline(true); return r.json(); })
+    .catch(function(){ setOnline(false); return null; });
 }
 
 function setOnline(ok) {
-  const dot = document.getElementById('conn-dot');
-  const txt = document.getElementById('conn-txt');
-  dot.className = 'conn-dot' + (ok?' ok':' off');
-  txt.textContent = ok ? 'online' : 'offline';
+  var dot = document.getElementById('cdot');
+  var txt = document.getElementById('ctxt');
+  if(dot) dot.className = 'cdot' + (ok ? ' on' : '');
+  if(txt) txt.textContent = ok ? 'online' : 'offline';
 }
 
-async function carregar() {
-  const [emp, disp] = await Promise.all([
-    api('/api/emprestimos'),
-    api('/api/dispositivos-ativos')
-  ]);
-  if (!emp || !disp) return;
-  state.emprestimos = emp;
-  state.dispAtivos = disp;
-  state.jblAtivo = emp.find(e => e.id==='JBL' && !e.data_devolucao) || null;
-  renderTudo();
+function carregar() {
+  return Promise.all([api('/api/emprestimos'), api('/api/dispositivos-ativos')])
+    .then(function(res) {
+      var emp = res[0], disp = res[1];
+      if (!emp || !disp) return;
+      S.emp = emp;
+      S.disp = disp;
+      S.jblAtivo = null;
+      for(var i=0;i<emp.length;i++){
+        if(emp[i].id==='JBL' && !emp[i].data_devolucao){ S.jblAtivo=emp[i]; break; }
+      }
+      renderTudo();
+    });
 }
 
 function renderTudo() {
-  renderJBL();
-  renderGrid();
-  renderStats();
-  renderDevolver();
-  renderPainel();
-  renderAdmin();
-  atualizarBadges();
-  atualizarEquipCounts();
+  renderJBL(); renderGrid(); renderStats();
+  renderDevolver(); renderPainel(); renderAdmin();
+  updateBadges(); updateEcounts();
 }
 
-/* ── ABAS ── */
+/* ABAS */
 function mudarAba(aba) {
-  ['retirar','devolver','painel','relatorio','admin'].forEach(a => {
-    document.getElementById('page-'+a).classList.toggle('active', a===aba);
-    const t = document.getElementById('tab-'+a);
-    if (t) t.classList.toggle('active', a===aba);
-  });
-  if (aba==='relatorio') setDefaultDates();
+  var abas = ['retirar','devolver','painel','relatorio','admin'];
+  for(var i=0;i<abas.length;i++){
+    var a = abas[i];
+    var pg = document.getElementById('page-'+a);
+    var tb = document.getElementById('tab-'+a);
+    if(pg) pg.classList.toggle('active', a===aba);
+    if(tb) tb.classList.toggle('active', a===aba);
+  }
+  if(aba==='relatorio') setDefaultDates();
 }
 
-function atualizarBadges() {
-  const ativos = state.emprestimos.filter(e => !e.data_devolucao && e.id!=='JBL').length;
-  const badge = document.getElementById('badge-ativos');
-  badge.textContent = ativos;
-  badge.style.display = ativos > 0 ? 'inline' : 'none';
+function updateBadges() {
+  var n = 0;
+  for(var i=0;i<S.emp.length;i++){ if(!S.emp[i].data_devolucao && S.emp[i].id!=='JBL') n++; }
+  var b = document.getElementById('badge-at');
+  if(b){ b.textContent=n; b.style.display=n>0?'inline':'none'; }
 }
 
-/* ── JBL ── */
+/* JBL */
 function renderJBL() {
-  const badge = document.getElementById('jbl-badge');
-  const owner = document.getElementById('jbl-owner');
-  const tog = document.getElementById('jbl-tog');
-  if (state.jblAtivo) {
-    badge.className = 'jbl-badge jbl-ocupado'; badge.textContent = 'OCUPADO';
-    owner.textContent = 'Com: ' + state.jblAtivo.nome;
-    tog.checked = false; tog.disabled = true;
+  var badge = document.getElementById('jbadge');
+  var sub = document.getElementById('jbl-sub');
+  var tog = document.getElementById('jbl-tog');
+  if(!badge) return;
+  if(S.jblAtivo){
+    badge.className='jbadge jocup'; badge.textContent='OCUPADO';
+    if(sub) sub.textContent='Com: '+S.jblAtivo.nome;
+    if(tog){ tog.checked=false; tog.disabled=true; }
   } else {
-    badge.className = 'jbl-badge jbl-livre'; badge.textContent = 'LIVRE';
-    owner.textContent = 'Disponível';
-    tog.checked = false; tog.disabled = false;
+    badge.className='jbadge jlivre'; badge.textContent='LIVRE';
+    if(sub) sub.textContent='Disponível';
+    if(tog){ tog.checked=false; tog.disabled=false; }
   }
 }
 
-/* ── GRADE DE SLOTS (drag-select) ── */
+/* GRID */
 function renderGrid() {
-  const cor = state.equipAtual;
-  const max = MAXIMOS[cor];
-  const ocupados = state.dispAtivos[cor] || [];
-  const grid = document.getElementById('slot-grid');
+  var cor = S.equip;
+  var max = MAXIMOS[cor];
+  var ocupados = S.disp[cor] || [];
+  var grid = document.getElementById('slot-grid');
+  if(!grid) return;
   grid.innerHTML = '';
-
-  for (let i = 1; i <= max; i++) {
-    const ocup = ocupados.includes(i);
-    const sel = state.selSlots.has(i);
-    const prof = ocup ? getProfSlot(cor, i) : '';
-    const div = document.createElement('div');
-    div.className = 'slot' + (ocup?' ocupado':(sel?' sel':' livre'));
-    div.dataset.num = i;
-    div.innerHTML = `<span class="snum">${i}</span>${prof?`<span class="sprof">${prof}</span>`:''}`;
-    if (!ocup) {
+  for(var i=1; i<=max; i++){
+    var ocup = ocupados.indexOf(i) >= 0;
+    var sel = selHas(i);
+    var prof = ocup ? getProfSlot(cor, i) : '';
+    var div = document.createElement('div');
+    div.className = 'slot ' + (ocup ? 'ocup' : (sel ? 'sel' : 'livre'));
+    div.setAttribute('data-num', String(i));
+    var inner = '<span class="snum">' + i + '</span>';
+    if(prof) inner += '<span class="sprof">' + prof + '</span>';
+    div.innerHTML = inner;
+    if(!ocup){
       div.addEventListener('mousedown', onSlotMouseDown);
       div.addEventListener('touchstart', onSlotTouch, {passive:true});
     }
     grid.appendChild(div);
   }
-
-  document.getElementById('sel-count').textContent = state.selSlots.size;
-  const livres = max - ocupados.length;
-  document.getElementById('total-livres').textContent = livres;
+  var sc = document.getElementById('sel-count');
+  var tl = document.getElementById('tot-livres');
+  if(sc) sc.textContent = selSize();
+  if(tl) tl.textContent = max - ocupados.length;
 }
 
 function getProfSlot(cor, num) {
-  const emp = state.emprestimos.find(e =>
-    !e.data_devolucao && e.carrinho===cor && e.numeros_dispositivos.includes(num)
-  );
-  if (!emp) return '';
-  const p = emp.nome.split(' ');
-  return p.length > 1 ? p[p.length-1] : p[0];
+  for(var i=0;i<S.emp.length;i++){
+    var e=S.emp[i];
+    if(!e.data_devolucao && e.carrinho===cor && e.numeros_dispositivos.indexOf(num)>=0){
+      var p=e.nome.split(' ');
+      return p.length>1?p[p.length-1]:p[0];
+    }
+  }
+  return '';
 }
 
-/* ── DRAG SELECT ── */
-let drag = { active:false, startX:0, startY:0, mode:null };
-const lasso = document.getElementById('lasso');
+/* DRAG SELECT */
+var drag = {active:false, startX:0, startY:0, mode:null};
+var lasso = document.getElementById('lasso');
 
 function onSlotMouseDown(e) {
-  if (e.button !== 0) return;
-  const num = parseInt(this.dataset.num);
-  drag.active = true;
-  drag.startX = e.clientX; drag.startY = e.clientY;
-  drag.mode = state.selSlots.has(num) ? 'desel' : 'sel';
+  if(e.button!==0) return;
+  var num = parseInt(this.getAttribute('data-num'));
+  drag.active=true; drag.startX=e.clientX; drag.startY=e.clientY;
+  drag.mode = selHas(num) ? 'desel' : 'sel';
   toggleSlot(num, drag.mode==='sel');
   document.addEventListener('mousemove', onMouseMove);
   document.addEventListener('mouseup', onMouseUp);
@@ -1340,527 +1348,484 @@ function onSlotMouseDown(e) {
 }
 
 function onSlotTouch(e) {
-  const num = parseInt(this.dataset.num);
-  toggleSlot(num, !state.selSlots.has(num));
+  var num = parseInt(this.getAttribute('data-num'));
+  toggleSlot(num, !selHas(num));
 }
 
 function onMouseMove(e) {
-  if (!drag.active) return;
-  const x = Math.min(drag.startX, e.clientX);
-  const y = Math.min(drag.startY, e.clientY);
-  const w = Math.abs(e.clientX - drag.startX);
-  const h = Math.abs(e.clientY - drag.startY);
-
-  if (w > 10 || h > 10) {
-    lasso.style.cssText = `display:block;left:${x}px;top:${y}px;width:${w}px;height:${h}px;`;
-    const r = { left:x, right:x+w, top:y, bottom:y+h };
-    document.querySelectorAll('.slot:not(.ocupado)').forEach(sl => {
-      const sr = sl.getBoundingClientRect();
-      const over = sr.left<r.right && sr.right>r.left && sr.top<r.bottom && sr.bottom>r.top;
-      if (over) toggleSlot(parseInt(sl.dataset.num), drag.mode==='sel');
-    });
+  if(!drag.active) return;
+  var x=Math.min(drag.startX,e.clientX), y=Math.min(drag.startY,e.clientY);
+  var w=Math.abs(e.clientX-drag.startX), h=Math.abs(e.clientY-drag.startY);
+  if(w>8||h>8){
+    if(lasso) lasso.style.cssText='display:block;left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;';
+    var r={left:x,right:x+w,top:y,bottom:y+h};
+    var slots=document.querySelectorAll('.slot:not(.ocup)');
+    for(var i=0;i<slots.length;i++){
+      var sl=slots[i], sr=sl.getBoundingClientRect();
+      if(sr.left<r.right && sr.right>r.left && sr.top<r.bottom && sr.bottom>r.top)
+        toggleSlot(parseInt(sl.getAttribute('data-num')), drag.mode==='sel');
+    }
   }
 }
 
 function onMouseUp() {
-  drag.active = false;
-  lasso.style.display = 'none';
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', onMouseUp);
+  drag.active=false;
+  if(lasso) lasso.style.display='none';
+  document.removeEventListener('mousemove',onMouseMove);
+  document.removeEventListener('mouseup',onMouseUp);
   renderGrid();
 }
 
 function toggleSlot(num, sel) {
-  if (sel) state.selSlots.add(num);
-  else state.selSlots.delete(num);
-  const el = document.querySelector(`.slot[data-num="${num}"]`);
-  if (el && !el.classList.contains('ocupado')) {
-    el.className = 'slot ' + (sel ? 'sel livre' : 'livre');
-    if (sel) el.querySelector('.snum').style.color='var(--blue-l)';
-    else el.querySelector('.snum').style.color='';
-  }
-  document.getElementById('sel-count').textContent = state.selSlots.size;
+  if(sel) selAdd(num); else selDel(num);
+  var el=document.querySelector('.slot[data-num="'+num+'"]');
+  if(el && !el.classList.contains('ocup')) el.className='slot '+(sel?'sel':'livre');
+  var sc=document.getElementById('sel-count');
+  if(sc) sc.textContent=selSize();
 }
 
-/* ── EQUIP SELECTOR ── */
+/* EQUIP */
 function setEquip(cor) {
-  state.equipAtual = cor; state.selSlots.clear();
-  ['preto','vermelho','cinza'].forEach(c =>
-    document.getElementById('et-'+c).classList.toggle('active', c===cor)
-  );
+  S.equip=cor; selClear();
+  var crs=['preto','vermelho','cinza'];
+  for(var i=0;i<crs.length;i++) document.getElementById('et-'+crs[i]).classList.toggle('active',crs[i]===cor);
   renderGrid();
 }
 
-function atualizarEquipCounts() {
-  ['preto','vermelho','cinza'].forEach(cor => {
-    const usados = (state.dispAtivos[cor]||[]).length;
-    const livres = MAXIMOS[cor] - usados;
-    document.getElementById('ec-'+cor).textContent = livres+' livre';
-  });
-}
-
-/* ── SELEÇÃO RÁPIDA ── */
-function selecionarTodosLivres() {
-  const cor = state.equipAtual;
-  const ocupados = state.dispAtivos[cor]||[];
-  state.selSlots.clear();
-  for (let i=1; i<=MAXIMOS[cor]; i++) {
-    if (!ocupados.includes(i)) state.selSlots.add(i);
+function updateEcounts() {
+  var crs=['preto','vermelho','cinza'];
+  for(var i=0;i<crs.length;i++){
+    var cor=crs[i], u=(S.disp[cor]||[]).length, el=document.getElementById('ec-'+cor);
+    if(el) el.textContent=(MAXIMOS[cor]-u)+' livre';
   }
+}
+
+/* SELEÇÃO RÁPIDA */
+function selecionarTodosLivres() {
+  var cor=S.equip, ocupados=S.disp[cor]||[];
+  selClear();
+  for(var i=1;i<=MAXIMOS[cor];i++) if(ocupados.indexOf(i)<0) selAdd(i);
   renderGrid();
 }
 
-function limparSelecao() {
-  state.selSlots.clear();
-  renderGrid();
-}
+function limparSelecao() { selClear(); renderGrid(); }
 
 function abrirIntervalo() {
-  const max = MAXIMOS[state.equipAtual];
-  const si = document.getElementById('int-ini'), sf = document.getElementById('int-fim');
-  si.innerHTML = sf.innerHTML = '';
-  for (let i=1; i<=max; i++) { si.add(new Option(i,i)); sf.add(new Option(i,i)); }
-  sf.value = max;
-  openOv('ov-intervalo');
+  var max=MAXIMOS[S.equip];
+  var si=document.getElementById('int-ini'), sf=document.getElementById('int-fim');
+  si.innerHTML=sf.innerHTML='';
+  for(var i=1;i<=max;i++){ si.add(new Option(i,i)); sf.add(new Option(i,i)); }
+  sf.value=max; openOv('ov-intervalo');
 }
 
 function aplicarIntervalo() {
-  const ini = parseInt(document.getElementById('int-ini').value);
-  const fim = parseInt(document.getElementById('int-fim').value);
-  if (ini > fim) { toast('⚠️ Início maior que o fim!', 'err'); return; }
-  const ocupados = state.dispAtivos[state.equipAtual]||[];
-  for (let i=ini; i<=fim; i++) {
-    if (!ocupados.includes(i)) state.selSlots.add(i);
-  }
-  closeOv('ov-intervalo');
-  renderGrid();
+  var ini=parseInt(document.getElementById('int-ini').value);
+  var fim=parseInt(document.getElementById('int-fim').value);
+  if(ini>fim){toast('Início maior que o fim!','err');return;}
+  var ocupados=S.disp[S.equip]||[];
+  for(var i=ini;i<=fim;i++) if(ocupados.indexOf(i)<0) selAdd(i);
+  closeOv('ov-intervalo'); renderGrid();
 }
 
-/* ── RETIRADA ── */
+/* RETIRADA */
 function confirmarRetirada() {
-  const nome = document.getElementById('r-nome').value.trim();
-  const ident = document.getElementById('r-ident').value.trim().toUpperCase();
-  const turma = document.getElementById('r-turma').value.trim();
-  const jblSel = document.getElementById('jbl-tog').checked;
-  const nums = [...state.selSlots];
-
-  if (!nome) { toast('⚠️ Informe seu nome.', 'err'); return; }
-  if (!ident || !/^110[0-9]{4}$/.test(ident)) {
-    toast('⚠️ Identificação 110XXXX é obrigatória.', 'err'); return;
-  }
-  if (!nums.length && !jblSel) {
-    toast('⚠️ Selecione ao menos um equipamento.', 'err'); return;
-  }
-
-  const pillsHtml = nums.map(n =>
-    `<span class="dpill ${state.equipAtual}">${n}</span>`).join('');
-  const carr = {preto:'Preto 🖥️', vermelho:'Vermelho 🖥️', cinza:'Cinza 📱'}[state.equipAtual];
-
-  document.getElementById('mi-retirar').innerHTML =
-    `<strong>${nome}</strong> <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-sec)">(${ident})</span>` +
-    (turma ? ` <span class="turma-tag">${turma}</span>` : '') +
-    (nums.length ? `<br><br><strong>${carr}</strong> — ${nums.length} item(ns)<br><div style="margin-top:6px">${pillsHtml}</div>` : '') +
-    (jblSel ? '<br>🔊 <strong>Caixa JBL</strong>' : '');
-
-  state.pendRetirada = { nome, ident, turma, jblSel, nums: nums.slice() };
+  var nome=document.getElementById('r-nome').value.trim();
+  var ident=document.getElementById('r-ident').value.trim().toUpperCase();
+  var turma=document.getElementById('r-turma').value.trim();
+  var jblSel=document.getElementById('jbl-tog').checked;
+  var nums=selArr();
+  if(!nome){toast('Informe seu nome.','err');return;}
+  if(!ident||!/^110[0-9]{4}$/.test(ident)){toast('Identificação 110XXXX obrigatória.','err');return;}
+  if(!nums.length&&!jblSel){toast('Selecione ao menos um equipamento.','err');return;}
+  var carr={preto:'Preto',vermelho:'Vermelho',cinza:'Cinza'}[S.equip];
+  var pillsHtml='';
+  for(var i=0;i<nums.length;i++) pillsHtml+='<span class="dpill '+S.equip+'">'+nums[i]+'</span>';
+  var info='<strong>'+nome+'</strong> ('+ident+')';
+  if(turma) info+=' <span class="turmatag">'+turma+'</span>';
+  if(nums.length) info+='<br><br><strong>'+carr+'</strong> — '+nums.length+' item(ns)<br><div style="margin-top:6px">'+pillsHtml+'</div>';
+  if(jblSel) info+='<br>🔊 <strong>Caixa JBL</strong>';
+  document.getElementById('mi-retirar').innerHTML=info;
+  S.pendRet={nome:nome,ident:ident,turma:turma,jblSel:jblSel,nums:nums.slice()};
   openOv('ov-retirar');
 }
 
-async function executarRetirada() {
-  const { nome, ident, turma, jblSel, nums } = state.pendRetirada;
-  closeOv('ov-retirar');
-
-  // JBL
-  if (jblSel && !state.jblAtivo) {
-    await api('/api/registrar', { method:'POST', body: JSON.stringify({
-      nome, id:'JBL', carrinho:'jbl', tipo:'professor',
-      turma, obs:'Caixa JBL', previsao:null, numeros_dispositivos:[1]
-    })});
+function executarRetirada() {
+  var p=S.pendRet; closeOv('ov-retirar');
+  var chain=Promise.resolve();
+  if(p.jblSel&&!S.jblAtivo){
+    chain=chain.then(function(){
+      return api('/api/registrar',{method:'POST',body:JSON.stringify({nome:p.nome,id:'JBL',carrinho:'jbl',tipo:'professor',turma:p.turma,obs:'Caixa JBL',previsao:null,numeros_dispositivos:[1]})});
+    });
   }
-
-  // Dispositivos
-  if (nums.length) {
-    const r = await api('/api/registrar', { method:'POST', body: JSON.stringify({
-      nome, id:ident, carrinho:state.equipAtual, tipo:'professor',
-      turma, obs:'', previsao:null, numeros_dispositivos:nums
-    })});
-    if (!r) { toast('❌ Erro de conexão.', 'err'); return; }
-    if (r.erro) { toast('⚠️ '+r.erro, 'err'); return; }
+  if(p.nums.length){
+    chain=chain.then(function(){
+      return api('/api/registrar',{method:'POST',body:JSON.stringify({nome:p.nome,id:p.ident,carrinho:S.equip,tipo:'professor',turma:p.turma,obs:'',previsao:null,numeros_dispositivos:p.nums})});
+    }).then(function(r){
+      if(!r){toast('Erro de conexão.','err');return Promise.reject();}
+      if(r.erro){toast(r.erro,'err');return Promise.reject();}
+    });
   }
-
-  await carregar();
-  state.selSlots.clear();
-  renderGrid();
-  document.getElementById('r-nome').value='';
-  document.getElementById('r-ident').value='';
-  document.getElementById('r-turma').value='';
-  document.getElementById('jbl-tog').checked=false;
-  toast('✅ Retirada registrada com sucesso!', 'ok');
+  chain.then(function(){
+    return carregar();
+  }).then(function(){
+    selClear(); renderGrid();
+    document.getElementById('r-nome').value='';
+    document.getElementById('r-ident').value='';
+    document.getElementById('r-turma').value='';
+    document.getElementById('jbl-tog').checked=false;
+    toast('✅ Retirada registrada!','ok');
+  }).catch(function(){});
 }
 
-/* ── DEVOLUÇÃO ── */
+/* DEVOLUÇÃO */
 function renderDevolver() {
-  const busca = (document.getElementById('dev-busca')||{value:''}).value.toLowerCase();
-  const lista = document.getElementById('lista-ativos');
-  const empty = document.getElementById('empty-dev');
-  let ativos = state.emprestimos.filter(e => !e.data_devolucao && e.id!=='JBL');
-  if (busca) ativos = ativos.filter(e =>
-    e.nome.toLowerCase().includes(busca) || e.id.toLowerCase().includes(busca)
-  );
-  ativos.sort((a,b) => new Date(a.data_emprestimo)-new Date(b.data_emprestimo));
+  var busca=(document.getElementById('dev-busca')||{value:''}).value.toLowerCase();
+  var lista=document.getElementById('lista-ativos');
+  var empty=document.getElementById('empty-dev');
+  var ativos=[];
+  for(var i=0;i<S.emp.length;i++) if(!S.emp[i].data_devolucao&&S.emp[i].id!=='JBL') ativos.push(S.emp[i]);
+  if(busca) ativos=ativos.filter(function(e){return e.nome.toLowerCase().indexOf(busca)>=0||e.id.toLowerCase().indexOf(busca)>=0;});
+  ativos.sort(function(a,b){return new Date(a.data_emprestimo)-new Date(b.data_emprestimo);});
+  if(!lista) return;
   lista.innerHTML='';
-  if (!ativos.length) { empty.style.display='block'; lista.style.display='none'; return; }
-  empty.style.display='none'; lista.style.display='flex';
-
-  ativos.forEach(emp => {
-    const late = isLate(emp);
-    const pills = emp.numeros_dispositivos.map(n =>
-      `<span class="dpill ${emp.carrinho}">${n}</span>`).join('');
-    const jblEmp = state.emprestimos.find(e =>
-      e.id==='JBL' && !e.data_devolucao && e.nome===emp.nome
-    );
-    const carr = {preto:'Preto 🖥️',vermelho:'Vermelho 🖥️',cinza:'Cinza 📱'}[emp.carrinho];
-    const d = document.createElement('div');
-    d.className = 'loan-card' + (late?' late':'');
-    d.innerHTML = `
-      <div class="loan-head">
-        <div>
-          <div class="loan-name">${emp.nome}${late?'<span style="font-size:10px;color:var(--orange-l);font-weight:700;margin-left:8px;">⚠ ATRASO</span>':''}
-          </div>
-          <div class="loan-meta">
-            <span class="loan-id">${emp.id}</span>
-            ${emp.turma?`<span class="turma-tag">${emp.turma}</span>`:''}
-            <span style="font-size:11px;color:var(--text-sec);">${carr}</span>
-            ${jblEmp?'<span class="dpill jbl">JBL</span>':''}
-          </div>
-        </div>
-        <div class="loan-time ${late?'late':''}">⏱ ${elapsed(emp.data_emprestimo)}</div>
-      </div>
-      <div class="loan-body">
-        <div class="loan-devices">${pills}</div>
-      </div>
-      <div class="loan-actions">
-        <button class="btn btn-devolver" style="padding:10px;font-size:12px;" onclick="abrirDevolver('${emp.id}')">↩ Devolver</button>
-        <button class="btn btn-ghost" style="padding:10px;font-size:12px;" onclick="devolverTudo('${emp.id}','${emp.nome.replace(/'/g,'\\'')}')">🔄 Devolver tudo</button>
-      </div>`;
+  if(!ativos.length){if(empty)empty.style.display='block';lista.style.display='none';return;}
+  if(empty)empty.style.display='none';
+  lista.style.display='flex';
+  for(var i=0;i<ativos.length;i++){
+    var emp=ativos[i], late=isLate(emp);
+    var carr={preto:'Preto 🖥️',vermelho:'Vermelho 🖥️',cinza:'Cinza 📱'}[emp.carrinho]||emp.carrinho;
+    var pills='';
+    for(var j=0;j<emp.numeros_dispositivos.length;j++) pills+='<span class="dpill '+emp.carrinho+'">'+emp.numeros_dispositivos[j]+'</span>';
+    var jblEmp=null;
+    for(var k=0;k<S.emp.length;k++) if(S.emp[k].id==='JBL'&&!S.emp[k].data_devolucao&&S.emp[k].nome===emp.nome){jblEmp=S.emp[k];break;}
+    var d=document.createElement('div');
+    d.className='lcard'+(late?' late':'');
+    var safeId=emp.id.replace(/'/g,"\\'");
+    var safeName=emp.nome.replace(/'/g,"\\'");
+    d.innerHTML=
+      '<div class="lcard-head"><div>'+
+        '<div class="lname">'+emp.nome+(late?'<span class="latetag">⚠ ATRASO</span>':'')+'</div>'+
+        '<div class="lmeta"><span class="lid">'+emp.id+'</span>'+
+        (emp.turma?'<span class="turmatag">'+emp.turma+'</span>':'')+
+        '<span style="font-size:11px;color:var(--text-sec)">'+carr+'</span>'+
+        (jblEmp?'<span class="dpill jbl">JBL</span>':'')+
+        '</div></div>'+
+        '<div class="ltime'+(late?' late':'')+'">⏱ '+elapsed(emp.data_emprestimo)+'</div>'+
+      '</div>'+
+      '<div class="lbody"><div class="ldevices">'+pills+'</div></div>'+
+      '<div class="lactions">'+
+        '<button class="btn btn-devolver" style="padding:10px;font-size:12px;" onclick="abrirDevolver(\''+safeId+'\')">↩ Devolver</button>'+
+        '<button class="btn btn-ghost" style="padding:10px;font-size:12px;" onclick="devolverTudo(\''+safeId+'\',\''+safeName+'\')">🔄 Devolver tudo</button>'+
+      '</div>';
     lista.appendChild(d);
-  });
+  }
 }
 
 function abrirDevolver(id) {
-  state.idDevolver = id;
-  const emp = state.emprestimos.find(e => e.id===id);
-  const pills = emp.numeros_dispositivos.map(n =>
-    `<span class="dpill ${emp.carrinho}">${n}</span>`).join(' ');
-  const jblEmp = state.emprestimos.find(e => e.id==='JBL'&&!e.data_devolucao&&e.nome===emp.nome);
-  document.getElementById('mi-devolver').innerHTML =
-    `<strong>${emp.nome}</strong> (${id})<br>` +
-    `Carrinho: <strong>${emp.carrinho.toUpperCase()}</strong><br>` +
-    `Tempo fora: <strong>${elapsed(emp.data_emprestimo)}</strong>` +
-    (jblEmp?'<br>🔊 Devolverá também a <strong>JBL</strong>':'') +
-    `<br><br>${pills}`;
+  S.idDev=id;
+  var emp=null;
+  for(var i=0;i<S.emp.length;i++) if(S.emp[i].id===id){emp=S.emp[i];break;}
+  if(!emp) return;
+  var pills='';
+  for(var i=0;i<emp.numeros_dispositivos.length;i++) pills+='<span class="dpill '+emp.carrinho+'">'+emp.numeros_dispositivos[i]+'</span> ';
+  var jblEmp=null;
+  for(var k=0;k<S.emp.length;k++) if(S.emp[k].id==='JBL'&&!S.emp[k].data_devolucao&&S.emp[k].nome===emp.nome){jblEmp=S.emp[k];break;}
+  document.getElementById('mi-devolver').innerHTML=
+    '<strong>'+emp.nome+'</strong> ('+id+')<br>'+
+    'Carrinho: <strong>'+emp.carrinho.toUpperCase()+'</strong><br>'+
+    'Tempo fora: <strong>'+elapsed(emp.data_emprestimo)+'</strong>'+
+    (jblEmp?'<br>🔊 Devolverá também a <strong>JBL</strong>':'')+
+    '<br><br>'+pills;
   openOv('ov-devolver');
 }
 
-async function executarDevolucao() {
-  const id = state.idDevolver;
-  const emp = state.emprestimos.find(e=>e.id===id);
-  const jblEmp = state.emprestimos.find(e=>e.id==='JBL'&&!e.data_devolucao&&e.nome===emp?.nome);
-  if (jblEmp) await api('/api/devolver/JBL',{method:'PUT'});
-  const r = await api('/api/devolver/'+id,{method:'PUT'});
-  closeOv('ov-devolver');
-  if (r&&r.ok) { await carregar(); toast('✅ Devolução registrada!','ok'); }
-  else toast('❌ Erro ao devolver.','err');
+function executarDevolucao() {
+  var id=S.idDev;
+  var emp=null;
+  for(var i=0;i<S.emp.length;i++) if(S.emp[i].id===id){emp=S.emp[i];break;}
+  var jblEmp=null;
+  if(emp) for(var k=0;k<S.emp.length;k++) if(S.emp[k].id==='JBL'&&!S.emp[k].data_devolucao&&S.emp[k].nome===emp.nome){jblEmp=S.emp[k];break;}
+  var chain=Promise.resolve();
+  if(jblEmp) chain=chain.then(function(){return api('/api/devolver/JBL',{method:'PUT'});});
+  chain.then(function(){return api('/api/devolver/'+id,{method:'PUT'});})
+    .then(function(r){closeOv('ov-devolver');if(r&&r.ok){carregar().then(function(){toast('✅ Devolução registrada!','ok');});}else toast('Erro ao devolver.','err');});
 }
 
-async function devolverTudo(id, nome) {
-  const jblEmp = state.emprestimos.find(e=>e.id==='JBL'&&!e.data_devolucao&&e.nome===nome);
-  if (jblEmp) await api('/api/devolver/JBL',{method:'PUT'});
-  const r = await api('/api/devolver/'+id,{method:'PUT'});
-  if (r&&r.ok) { await carregar(); toast('🔄 Tudo devolvido!','ok'); }
-  else toast('❌ Erro.','err');
+function devolverTudo(id,nome) {
+  var jblEmp=null;
+  for(var k=0;k<S.emp.length;k++) if(S.emp[k].id==='JBL'&&!S.emp[k].data_devolucao&&S.emp[k].nome===nome){jblEmp=S.emp[k];break;}
+  var chain=Promise.resolve();
+  if(jblEmp) chain=chain.then(function(){return api('/api/devolver/JBL',{method:'PUT'});});
+  chain.then(function(){return api('/api/devolver/'+id,{method:'PUT'});})
+    .then(function(r){if(r&&r.ok) carregar().then(function(){toast('🔄 Tudo devolvido!','ok');}); else toast('Erro.','err');});
 }
 
-/* ── PAINEL / STATS ── */
+/* STATS */
 function renderStats() {
-  let at=0, late=0;
-  state.emprestimos.forEach(e=>{if(!e.data_devolucao&&e.id!=='JBL'){at++;if(isLate(e))late++;}});
-  document.getElementById('s-ativos').textContent=at;
-  document.getElementById('s-atrasados').textContent=late;
-  ['preto','vermelho','cinza'].forEach(cor=>{
-    const u=(state.dispAtivos[cor]||[]).length, m=MAXIMOS[cor];
-    document.getElementById('s-'+cor).textContent=u;
-    document.getElementById('sb-'+cor).style.width=(u/m*100)+'%';
-  });
-  const jbl = state.jblAtivo;
-  const jblEl = document.getElementById('s-jbl');
-  jblEl.textContent = jbl?'Ocupada':'Livre';
-  jblEl.style.color = jbl?'var(--red-l)':'var(--orange-l)';
+  var at=0,lt=0;
+  for(var i=0;i<S.emp.length;i++) if(!S.emp[i].data_devolucao&&S.emp[i].id!=='JBL'){at++;if(isLate(S.emp[i]))lt++;}
+  var e;
+  e=document.getElementById('sv-ativos'); if(e) e.textContent=at;
+  e=document.getElementById('sv-late'); if(e) e.textContent=lt;
+  var crs=['preto','vermelho','cinza'];
+  for(var i=0;i<crs.length;i++){
+    var cor=crs[i], u=(S.disp[cor]||[]).length, m=MAXIMOS[cor];
+    e=document.getElementById('sv-'+cor); if(e) e.textContent=u;
+    e=document.getElementById('sb-'+cor); if(e) e.style.width=(u/m*100)+'%';
+  }
+  var jblEl=document.getElementById('sv-jbl');
+  if(jblEl){jblEl.textContent=S.jblAtivo?'Ocupada':'Livre';jblEl.style.color=S.jblAtivo?'var(--red-l)':'var(--orange-l)';}
 }
 
+/* PAINEL */
 function setPFiltro(f) {
-  state.filtroP=f;
-  ['ativos','todos'].forEach(x=>document.getElementById('pfb-'+x).classList.toggle('active',x===f));
+  S.pFiltro=f;
+  document.getElementById('pfb-ativos').classList.toggle('active',f==='ativos');
+  document.getElementById('pfb-todos').classList.toggle('active',f==='todos');
   renderPainel();
 }
-
-function renderPainel() {
-  buildTable('tbl-painel','ep-painel',state.filtroP,null);
-}
+function renderPainel(){buildTable('tbl-painel','ep-painel',S.pFiltro,null);}
 
 function setAFiltro(f) {
-  state.filtroA=f;
-  ['at','td'].forEach((x,i)=>document.getElementById('afb-'+x).classList.toggle('active',['ativos','todos'][i]===f));
+  S.aFiltro=f;
+  document.getElementById('afb-at').classList.toggle('active',f==='ativos');
+  document.getElementById('afb-td').classList.toggle('active',f==='todos');
   renderAdmin();
 }
+function renderAdmin(){buildTable('tbl-admin','ep-admin',S.aFiltro,'aluno');}
 
-function renderAdmin() {
-  buildTable('tbl-admin','ep-admin',state.filtroA,'aluno');
-}
-
-function buildTable(tbodyId, emptyId, filtro, soTipo) {
-  const tbody = document.getElementById(tbodyId);
-  const empty = document.getElementById(emptyId);
+function buildTable(tbodyId,emptyId,filtro,soTipo) {
+  var tbody=document.getElementById(tbodyId), empty=document.getElementById(emptyId);
+  if(!tbody) return;
   tbody.innerHTML='';
-  let lista = state.emprestimos.filter(e=>e.id!=='JBL');
-  if (soTipo) lista = lista.filter(e=>e.tipo===soTipo);
-  if (filtro==='ativos') lista = lista.filter(e=>!e.data_devolucao);
-  lista.sort((a,b)=>new Date(b.data_emprestimo)-new Date(a.data_emprestimo));
-  if (!lista.length) { empty.style.display='block'; return; }
-  empty.style.display='none';
-  lista.forEach(emp=>{
-    const ativo=!emp.data_devolucao, late=isLate(emp);
-    const pills=emp.numeros_dispositivos.map(n=>`<span class="dpill ${emp.carrinho}">${n}</span>`).join('');
-    const status=ativo&&late?'<span class="pill pill-late">ATRASO</span>':
-      ativo?'<span class="pill pill-ativo">ATIVO</span>':'<span class="pill pill-dev">DEV</span>';
-    const tipo=emp.tipo==='aluno'?'<span class="pill pill-aluno">Aluno</span>':'<span class="pill pill-prof">Prof</span>';
-    const carr=`<span class="carr-tag carr-${emp.carrinho}">${{preto:'Preto',vermelho:'Verm.',cinza:'Cinza'}[emp.carrinho]}</span>`;
-    const tempo=ativo?elapsed(emp.data_emprestimo):
-      new Date(emp.data_devolucao).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-    const acoes=ativo?
-      `<button class="tbl-btn tbl-btn-dev" onclick="abrirDevolver('${emp.id}')">↩ Dev</button>`:
-      `<button class="tbl-btn tbl-btn-del" onclick="abrirExcluir('${emp.id}')">🗑</button>`;
-    const tr=document.createElement('tr');
+  var lista=[];
+  for(var i=0;i<S.emp.length;i++) if(S.emp[i].id!=='JBL') lista.push(S.emp[i]);
+  if(soTipo) lista=lista.filter(function(e){return e.tipo===soTipo;});
+  if(filtro==='ativos') lista=lista.filter(function(e){return !e.data_devolucao;});
+  lista.sort(function(a,b){return new Date(b.data_emprestimo)-new Date(a.data_emprestimo);});
+  if(!lista.length){if(empty)empty.style.display='block';return;}
+  if(empty) empty.style.display='none';
+  for(var i=0;i<lista.length;i++){
+    var emp=lista[i], ativo=!emp.data_devolucao, late=isLate(emp);
+    var pills='';
+    for(var j=0;j<emp.numeros_dispositivos.length;j++) pills+='<span class="dpill '+emp.carrinho+'">'+emp.numeros_dispositivos[j]+'</span>';
+    var status=ativo&&late?'<span class="pill p-late">ATRASO</span>':ativo?'<span class="pill p-ativo">ATIVO</span>':'<span class="pill p-dev">DEV</span>';
+    var tipo=emp.tipo==='aluno'?'<span class="pill p-aluno">Aluno</span>':'<span class="pill p-prof">Prof</span>';
+    var carrNm={preto:'Preto',vermelho:'Verm.',cinza:'Cinza'}[emp.carrinho]||emp.carrinho;
+    var carr='<span class="carr-'+emp.carrinho+'">'+carrNm+'</span>';
+    var safeId=emp.id.replace(/'/g,"\\'");
+    var acoes=ativo?'<button class="tbtn tbtn-dev" onclick="abrirDevolver(\''+safeId+'\')">↩ Dev</button>':'<button class="tbtn tbtn-del" onclick="abrirExcluir(\''+safeId+'\')">🗑</button>';
+    var dataRet=new Date(emp.data_emprestimo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    var tempo=ativo?elapsed(emp.data_emprestimo):(emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—');
+    var tr=document.createElement('tr');
     if(late) tr.className='row-late';
-    tr.innerHTML=
-      `<td><strong style="font-size:12px">${emp.nome}</strong><br><span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-sec)">${emp.id}</span></td>`+
-      `<td>${tipo}</td>`+
-      `<td>${emp.turma?`<span class="turma-tag">${emp.turma}</span>`:'—'}</td>`+
-      `<td>${carr}</td>`+
-      `<td>${pills}</td>`+
-      `<td style="font-size:11px;color:var(--text-sec);font-family:'JetBrains Mono',monospace;white-space:nowrap">${new Date(emp.data_emprestimo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>`+
-      `<td style="font-size:11px;color:var(--text-sec);font-family:'JetBrains Mono',monospace;white-space:nowrap">${tempo}</td>`+
-      `<td>${status}</td>`+
-      `<td>${acoes}</td>`;
+    var baseCols='<td><strong style="font-size:12px">'+emp.nome+'</strong><br><span style="font-size:10px;color:var(--text-sec)">'+emp.id+'</span></td>'
+      +(soTipo?''
+        :'<td>'+tipo+'</td>')
+      +'<td>'+(emp.turma?'<span class="turmatag">'+emp.turma+'</span>':'—')+'</td>'
+      +'<td>'+carr+'</td>'
+      +'<td>'+pills+'</td>'
+      +'<td style="font-size:11px;color:var(--text-sec);white-space:nowrap">'+dataRet+'</td>'
+      +'<td style="font-size:11px;color:var(--text-sec);white-space:nowrap">'+tempo+'</td>'
+      +'<td>'+status+'</td>'
+      +'<td>'+acoes+'</td>';
+    tr.innerHTML=baseCols;
     tbody.appendChild(tr);
-  });
-}
-
-/* ── EXCLUIR ── */
-function abrirExcluir(id) {
-  state.idExcluir=id;
-  const emp=state.emprestimos.find(e=>e.id===id);
-  document.getElementById('mi-excluir').innerHTML=
-    `<strong>${emp.nome}</strong> (${id})<br>Carrinho: ${emp.carrinho.toUpperCase()}<br>Dispositivos: ${emp.numeros_dispositivos.join(', ')}`;
-  openOv('ov-excluir');
-}
-
-async function executarExcluir() {
-  const r=await api('/api/excluir/'+state.idExcluir,{method:'DELETE'});
-  closeOv('ov-excluir');
-  if(r&&r.ok){await carregar();toast('🗑️ Registro excluído.','warn');}
-  else toast('❌ Erro ao excluir.','err');
-}
-
-/* ── ADMIN ── */
-async function registrarAluno() {
-  const nome=document.getElementById('a-nome').value.trim();
-  const ra=document.getElementById('a-ra').value.trim().toUpperCase();
-  const turma=document.getElementById('a-turma').value.trim();
-  const carrinho=document.getElementById('a-equip').value;
-  const numStr=document.getElementById('a-nums').value.trim();
-  const obs=document.getElementById('a-obs').value.trim();
-  if(!nome||!ra){toast('⚠️ Preencha nome e RA.','err');return;}
-  const nums=numStr.split(',').map(n=>parseInt(n.trim())).filter(n=>!isNaN(n));
-  if(!nums.length){toast('⚠️ Informe os números.','err');return;}
-  const r=await api('/api/registrar',{method:'POST',body:JSON.stringify({
-    nome,id:ra,carrinho,tipo:'aluno',turma,obs,previsao:null,numeros_dispositivos:nums
-  })});
-  if(!r){toast('❌ Erro de conexão.','err');return;}
-  if(r.erro){toast('⚠️ '+r.erro,'err');return;}
-  await carregar();
-  ['a-nome','a-ra','a-turma','a-nums','a-obs'].forEach(id=>document.getElementById(id).value='');
-  toast('✅ '+nums.length+' dispositivo(s) lançado(s)!','ok');
-}
-
-/* ── PIN ── */
-function solicitarAdmin() {
-  if(state.adminLogado){mudarAba('admin');return;}
-  state.pinBuf=''; updPinDots();
-  document.getElementById('pin-err').textContent='';
-  openOv('ov-pin');
-}
-
-async function digPin(d) {
-  if(state.pinBuf.length>=4) return;
-  state.pinBuf+=d; updPinDots();
-  if(state.pinBuf.length===4){
-    setTimeout(async()=>{
-      const r=await api('/api/pin/verificar',{method:'POST',body:JSON.stringify({pin:state.pinBuf})});
-      if(r&&r.ok){state.adminLogado=true;closeOv('ov-pin');mudarAba('admin');toast('🔐 Admin liberado!','warn');}
-      else{document.getElementById('pin-err').textContent='PIN incorreto.';state.pinBuf='';updPinDots();}
-    },180);
   }
 }
 
-function delPin(){state.pinBuf=state.pinBuf.slice(0,-1);updPinDots();document.getElementById('pin-err').textContent='';}
-function updPinDots(){for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('on',i<state.pinBuf.length);}
-
-async function salvarPin(){
-  const atual=document.getElementById('cp-atual').value.trim();
-  const novo=document.getElementById('cp-novo').value.trim();
-  const conf=document.getElementById('cp-conf').value.trim();
-  if(novo!==conf){toast('⚠️ PINs não coincidem.','err');return;}
-  if(!/^\d{4}$/.test(novo)){toast('⚠️ PIN deve ter 4 dígitos.','err');return;}
-  const r=await api('/api/pin/alterar',{method:'POST',body:JSON.stringify({pin_atual:atual,pin_novo:novo})});
-  if(r&&r.ok){closeOv('ov-change-pin');['cp-atual','cp-novo','cp-conf'].forEach(id=>document.getElementById(id).value='');toast('✅ PIN alterado!','ok');}
-  else toast('⚠️ PIN atual incorreto.','err');
+/* EXCLUIR */
+function abrirExcluir(id) {
+  S.idEx=id;
+  var emp=null; for(var i=0;i<S.emp.length;i++) if(S.emp[i].id===id){emp=S.emp[i];break;}
+  if(!emp) return;
+  document.getElementById('mi-excluir').innerHTML='<strong>'+emp.nome+'</strong> ('+id+')<br>Carrinho: '+emp.carrinho.toUpperCase()+'<br>Dispositivos: '+emp.numeros_dispositivos.join(', ');
+  openOv('ov-excluir');
+}
+function executarExcluir() {
+  api('/api/excluir/'+S.idEx,{method:'DELETE'}).then(function(r){
+    closeOv('ov-excluir');
+    if(r&&r.ok) carregar().then(function(){toast('🗑️ Excluído.','warn');}); else toast('Erro.','err');
+  });
 }
 
-function sairAdmin(){state.adminLogado=false;mudarAba('retirar');toast('Admin encerrado.','warn');}
-function abrirAlterarPin(){openOv('ov-change-pin');}
+/* ADMIN */
+function registrarAluno() {
+  var nome=document.getElementById('a-nome').value.trim();
+  var ra=document.getElementById('a-ra').value.trim().toUpperCase();
+  var turma=document.getElementById('a-turma').value.trim();
+  var carrinho=document.getElementById('a-equip').value;
+  var numStr=document.getElementById('a-nums').value.trim();
+  var obs=document.getElementById('a-obs').value.trim();
+  if(!nome||!ra){toast('Preencha nome e RA.','err');return;}
+  var nums=numStr.split(',').map(function(n){return parseInt(n.trim());}).filter(function(n){return !isNaN(n);});
+  if(!nums.length){toast('Informe os números.','err');return;}
+  api('/api/registrar',{method:'POST',body:JSON.stringify({nome:nome,id:ra,carrinho:carrinho,tipo:'aluno',turma:turma,obs:obs,previsao:null,numeros_dispositivos:nums})})
+    .then(function(r){
+      if(!r){toast('Erro de conexão.','err');return;}
+      if(r.erro){toast(r.erro,'err');return;}
+      ['a-nome','a-ra','a-turma','a-nums','a-obs'].forEach(function(id){document.getElementById(id).value='';});
+      carregar().then(function(){toast('✅ '+nums.length+' dispositivo(s) lançado(s)!','ok');});
+    });
+}
 
-/* ── RELATÓRIO ── */
+/* PIN */
+function solicitarAdmin() {
+  if(S.adminOn){mudarAba('admin');return;}
+  S.pinBuf=''; updPinDots();
+  document.getElementById('perr').textContent='';
+  openOv('ov-pin');
+}
+function digPin(d) {
+  if(S.pinBuf.length>=4) return;
+  S.pinBuf+=String(d); updPinDots();
+  if(S.pinBuf.length===4){
+    var buf=S.pinBuf;
+    setTimeout(function(){
+      api('/api/pin/verificar',{method:'POST',body:JSON.stringify({pin:buf})}).then(function(r){
+        if(r&&r.ok){S.adminOn=true;closeOv('ov-pin');mudarAba('admin');toast('🔐 Admin liberado!','warn');}
+        else{document.getElementById('perr').textContent='PIN incorreto.';S.pinBuf='';updPinDots();}
+      });
+    },180);
+  }
+}
+function delPin(){S.pinBuf=S.pinBuf.slice(0,-1);updPinDots();document.getElementById('perr').textContent='';}
+function updPinDots(){for(var i=0;i<4;i++) document.getElementById('pd'+i).classList.toggle('on',i<S.pinBuf.length);}
+function salvarPin() {
+  var at=document.getElementById('cp-at').value.trim();
+  var nv=document.getElementById('cp-nv').value.trim();
+  var cf=document.getElementById('cp-cf').value.trim();
+  if(nv!==cf){toast('PINs não coincidem.','err');return;}
+  if(!/^\d{4}$/.test(nv)){toast('PIN deve ter 4 dígitos.','err');return;}
+  api('/api/pin/alterar',{method:'POST',body:JSON.stringify({pin_atual:at,pin_novo:nv})}).then(function(r){
+    if(r&&r.ok){closeOv('ov-chpin');['cp-at','cp-nv','cp-cf'].forEach(function(id){document.getElementById(id).value='';});toast('✅ PIN alterado!','ok');}
+    else toast('PIN atual incorreto.','err');
+  });
+}
+function sairAdmin(){S.adminOn=false;mudarAba('retirar');toast('Admin encerrado.','warn');}
+function abrirAlterarPin(){openOv('ov-chpin');}
+
+/* RELATÓRIO */
 function setDefaultDates() {
-  const hoje=new Date();
-  const ini=new Date(hoje.getFullYear(),hoje.getMonth(),1);
+  var hoje=new Date();
+  var ini=new Date(hoje.getFullYear(),hoje.getMonth(),1);
   document.getElementById('rf-ini').value=ini.toISOString().split('T')[0];
   document.getElementById('rf-fim').value=hoje.toISOString().split('T')[0];
 }
-
 function gerarRel() {
-  const ini=document.getElementById('rf-ini').value;
-  const fim=document.getElementById('rf-fim').value;
-  const tipo=document.getElementById('rf-tipo').value;
-  const carr=document.getElementById('rf-carr').value;
-  const stat=document.getElementById('rf-status').value;
-  const dtIni=ini?new Date(ini+'T00:00:00'):null;
-  const dtFim=fim?new Date(fim+'T23:59:59'):null;
-  state.relData=state.emprestimos.filter(emp=>{
-    if(emp.id==='JBL') return false;
-    const dt=new Date(emp.data_emprestimo);
-    if(dtIni&&dt<dtIni) return false;
-    if(dtFim&&dt>dtFim) return false;
-    if(tipo!=='todos'&&emp.tipo!==tipo) return false;
-    if(carr!=='todos'&&emp.carrinho!==carr) return false;
-    if(stat==='ativo'&&emp.data_devolucao) return false;
-    if(stat==='dev'&&!emp.data_devolucao) return false;
-    return true;
-  });
-  state.relData.sort((a,b)=>new Date(b.data_emprestimo)-new Date(a.data_emprestimo));
-  const tot=state.relData.length;
-  const prof=state.relData.filter(e=>e.tipo==='professor').length;
-  const aluno=state.relData.filter(e=>e.tipo==='aluno').length;
-  const dev=state.relData.filter(e=>e.data_devolucao).length;
-  const disp=state.relData.reduce((s,e)=>s+e.numeros_dispositivos.length,0);
-  document.getElementById('rs-tot').textContent=tot;
-  document.getElementById('rs-prof').textContent=prof;
-  document.getElementById('rs-aluno').textContent=aluno;
-  document.getElementById('rs-dev').textContent=dev;
-  document.getElementById('rs-aberto').textContent=tot-dev;
-  document.getElementById('rs-disp').textContent=disp;
-  document.getElementById('rel-stats').style.display='grid';
-  document.getElementById('rel-label').textContent='Período: '+(ini||'início')+' → '+(fim||'hoje')+' · '+tot+' registros';
-  const tbody=document.getElementById('tbl-rel');
-  const empty=document.getElementById('ep-rel');
+  var ini=document.getElementById('rf-ini').value;
+  var fim=document.getElementById('rf-fim').value;
+  var tipo=document.getElementById('rf-tipo').value;
+  var carr=document.getElementById('rf-carr').value;
+  var stat=document.getElementById('rf-status').value;
+  var dtIni=ini?new Date(ini+'T00:00:00'):null;
+  var dtFim=fim?new Date(fim+'T23:59:59'):null;
+  S.relData=[];
+  for(var i=0;i<S.emp.length;i++){
+    var emp=S.emp[i];
+    if(emp.id==='JBL') continue;
+    var dt=new Date(emp.data_emprestimo);
+    if(dtIni&&dt<dtIni) continue;
+    if(dtFim&&dt>dtFim) continue;
+    if(tipo!=='todos'&&emp.tipo!==tipo) continue;
+    if(carr!=='todos'&&emp.carrinho!==carr) continue;
+    if(stat==='ativo'&&emp.data_devolucao) continue;
+    if(stat==='dev'&&!emp.data_devolucao) continue;
+    S.relData.push(emp);
+  }
+  S.relData.sort(function(a,b){return new Date(b.data_emprestimo)-new Date(a.data_emprestimo);});
+  var tot=S.relData.length,prof=0,aluno=0,dev=0,disp=0;
+  for(var i=0;i<S.relData.length;i++){
+    var e=S.relData[i];
+    if(e.tipo==='professor') prof++; else aluno++;
+    if(e.data_devolucao) dev++;
+    disp+=e.numeros_dispositivos.length;
+  }
+  function sid(id,v){var el=document.getElementById(id);if(el)el.textContent=v;}
+  sid('rs-tot',tot);sid('rs-prof',prof);sid('rs-aluno',aluno);sid('rs-dev',dev);sid('rs-aberto',tot-dev);sid('rs-disp',disp);
+  var rs=document.getElementById('rel-stats');if(rs)rs.style.display='grid';
+  var rl=document.getElementById('rel-label');if(rl)rl.textContent='Período: '+(ini||'início')+' → '+(fim||'hoje')+' · '+tot+' registros';
+  var tbody=document.getElementById('tbl-rel'),empty=document.getElementById('ep-rel');
   tbody.innerHTML='';
-  if(!tot){empty.style.display='block';return;}
-  empty.style.display='none';
-  state.relData.forEach(emp=>{
-    const pills=emp.numeros_dispositivos.map(n=>`<span class="dpill ${emp.carrinho}">${n}</span>`).join('');
-    const status=emp.data_devolucao?'<span class="pill pill-dev">DEV</span>':'<span class="pill pill-ativo">ATIVO</span>';
-    const tipo=emp.tipo==='aluno'?'<span class="pill pill-aluno">Aluno</span>':'<span class="pill pill-prof">Prof</span>';
-    const devStr=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
-    const tr=document.createElement('tr');
-    tr.innerHTML=
-      `<td><strong style="font-size:12px">${emp.nome}</strong><br><span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text-sec)">${emp.id}</span></td>`+
-      `<td>${tipo}</td>`+
-      `<td>${emp.turma?`<span class="turma-tag">${emp.turma}</span>`:'—'}</td>`+
-      `<td><span class="carr-tag carr-${emp.carrinho}">${emp.carrinho.toUpperCase()}</span></td>`+
-      `<td>${pills}</td>`+
-      `<td style="font-size:11px;color:var(--text-sec);font-family:'JetBrains Mono',monospace;white-space:nowrap">${new Date(emp.data_emprestimo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>`+
-      `<td style="font-size:11px;color:var(--text-sec);font-family:'JetBrains Mono',monospace;white-space:nowrap">${devStr}</td>`+
-      `<td>${status}</td>`+
-      `<td style="font-size:11px;color:var(--text-dim)">${emp.obs||'—'}</td>`;
+  if(!tot){if(empty)empty.style.display='block';return;}
+  if(empty)empty.style.display='none';
+  for(var i=0;i<S.relData.length;i++){
+    var emp=S.relData[i];
+    var pills='';for(var j=0;j<emp.numeros_dispositivos.length;j++) pills+='<span class="dpill '+emp.carrinho+'">'+emp.numeros_dispositivos[j]+'</span>';
+    var status=emp.data_devolucao?'<span class="pill p-dev">DEV</span>':'<span class="pill p-ativo">ATIVO</span>';
+    var tipoTag=emp.tipo==='aluno'?'<span class="pill p-aluno">Aluno</span>':'<span class="pill p-prof">Prof</span>';
+    var devStr=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td><strong style="font-size:12px">'+emp.nome+'</strong><br><span style="font-size:10px;color:var(--text-sec)">'+emp.id+'</span></td>'
+      +'<td>'+tipoTag+'</td>'
+      +'<td>'+(emp.turma?'<span class="turmatag">'+emp.turma+'</span>':'—')+'</td>'
+      +'<td><span class="carr-'+emp.carrinho+'">'+emp.carrinho.toUpperCase()+'</span></td>'
+      +'<td>'+pills+'</td>'
+      +'<td style="font-size:11px;color:var(--text-sec);white-space:nowrap">'+new Date(emp.data_emprestimo).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</td>'
+      +'<td style="font-size:11px;color:var(--text-sec);white-space:nowrap">'+devStr+'</td>'
+      +'<td>'+status+'</td>'
+      +'<td style="font-size:11px;color:var(--text-dim)">'+(emp.obs||'—')+'</td>';
     tbody.appendChild(tr);
-  });
+  }
+}
+function exportarCSV() {
+  if(!S.relData.length){toast('Gere o relatório primeiro.','warn');return;}
+  var lines=['Nome,ID,Tipo,Turma,Carrinho,Dispositivos,Retirada,Devolução,Obs'];
+  for(var i=0;i<S.relData.length;i++){
+    var emp=S.relData[i];
+    var dev=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR'):'Em aberto';
+    lines.push(['"'+emp.nome+'"',emp.id,emp.tipo||'professor','"'+(emp.turma||'')+'"',emp.carrinho,'"'+emp.numeros_dispositivos.join(', ')+'"','"'+new Date(emp.data_emprestimo).toLocaleString('pt-BR')+'"','"'+dev+'"','"'+(emp.obs||'')+'"'].join(','));
+  }
+  var blob=new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='sesi_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.csv';
+  a.click(); toast('📊 CSV exportado!','ok');
+}
+function exportarPDF() {
+  if(!S.relData.length){toast('Gere o relatório primeiro.','warn');return;}
+  var ini=document.getElementById('rf-ini').value||'início';
+  var fim=document.getElementById('rf-fim').value||'hoje';
+  var rows='';
+  for(var i=0;i<S.relData.length;i++){
+    var emp=S.relData[i];
+    var dev=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR'):'Em aberto';
+    rows+='<tr><td>'+emp.nome+'</td><td>'+emp.id+'</td><td>'+(emp.tipo||'professor')+'</td><td>'+(emp.turma||'—')+'</td><td>'+emp.carrinho.toUpperCase()+'</td><td>'+emp.numeros_dispositivos.join(', ')+'</td><td>'+new Date(emp.data_emprestimo).toLocaleString('pt-BR')+'</td><td>'+dev+'</td><td>'+(emp.data_devolucao?'Devolvido':'Em aberto')+'</td></tr>';
+  }
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório SESI Sumaré</title><style>body{font-family:Arial,sans-serif;padding:20px;font-size:11px}h1{font-size:16px;margin-bottom:4px}.sub{color:#666;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#1e293b;color:#fff;padding:7px 9px;text-align:left;font-size:10px}td{padding:6px 9px;border-bottom:1px solid #e2e8f0}@media print{button{display:none}}</style></head><body><h1>SESI Sumaré — Controle de Equipamentos</h1><p class="sub">Período: '+ini+' → '+fim+' · '+S.relData.length+' registros · Gerado em '+new Date().toLocaleString('pt-BR')+'</p><table><thead><tr><th>Nome</th><th>ID</th><th>Tipo</th><th>Turma</th><th>Carrinho</th><th>Dispositivos</th><th>Retirada</th><th>Devolução</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></body></html>';
+  var w=window.open('','_blank');w.document.write(html);w.document.close();
+  setTimeout(function(){w.print();},400);
+  toast('📄 Abrindo PDF...','ok');
 }
 
-function exportarCSV(){
-  if(!state.relData.length){toast('⚠️ Gere o relatório primeiro.','warn');return;}
-  const linhas=['Nome,ID,Tipo,Turma,Carrinho,Dispositivos,Retirada,Devolução,Obs'];
-  state.relData.forEach(emp=>{
-    const dev=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR'):'Em aberto';
-    linhas.push(['"'+ emp.nome+'"',emp.id,emp.tipo||'professor','"'+(emp.turma||'')+'"'  ,emp.carrinho,'"'+ emp.numeros_dispositivos.join(', ')+'"','"'+ new Date(emp.data_emprestimo).toLocaleString('pt-BR')+'"','"'+ dev+'"','"'+(emp.obs||'')+'"'  ].join(','));
-  });
-  const blob=new Blob(['\uFEFF'+linhas.join('\n')],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='sesi_emprestimos_'+new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')+'.csv';a.click();
-  toast('📊 CSV exportado!','ok');
-}
-
-function exportarPDF(){
-  if(!state.relData.length){toast('⚠️ Gere o relatório primeiro.','warn');return;}
-  const ini=document.getElementById('rf-ini').value||'início';
-  const fim=document.getElementById('rf-fim').value||'hoje';
-  const rows=state.relData.map(emp=>{
-    const dev=emp.data_devolucao?new Date(emp.data_devolucao).toLocaleString('pt-BR'):'Em aberto';
-    return `<tr><td>${emp.nome}</td><td>${emp.id}</td><td>${emp.tipo||'professor'}</td><td>${emp.turma||'—'}</td><td>${emp.carrinho.toUpperCase()}</td><td>${emp.numeros_dispositivos.join(', ')}</td><td>${new Date(emp.data_emprestimo).toLocaleString('pt-BR')}</td><td>${dev}</td><td>${emp.data_devolucao?'Devolvido':'Em aberto'}</td></tr>`;
-  }).join('');
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório SESI Sumaré</title>
-  <style>body{font-family:Arial,sans-serif;padding:20px;font-size:11px}h1{font-size:16px;margin-bottom:4px}
-  .sub{color:#666;margin-bottom:16px}table{width:100%;border-collapse:collapse}
-  th{background:#1e293b;color:#fff;padding:7px 9px;text-align:left;font-size:10px}
-  td{padding:6px 9px;border-bottom:1px solid #e2e8f0;font-size:10px}@media print{button{display:none}}</style>
-  </head><body><h1>SESI Sumaré — Controle de Equipamentos</h1>
-  <p class="sub">Período: ${ini} → ${fim} · ${state.relData.length} registros · Gerado em ${new Date().toLocaleString('pt-BR')}</p>
-  <table><thead><tr><th>Nome</th><th>ID</th><th>Tipo</th><th>Turma</th><th>Carrinho</th><th>Dispositivos</th><th>Retirada</th><th>Devolução</th><th>Status</th></tr></thead>
-  <tbody>${rows}</tbody></table></body></html>`;
-  const w=window.open('','_blank');w.document.write(html);w.document.close();
-  setTimeout(()=>w.print(),400);toast('📄 Abrindo PDF...','ok');
-}
-
-/* ── MODAIS ── */
+/* MODAL */
 function openOv(id){document.getElementById(id).classList.add('open');}
 function closeOv(id){document.getElementById(id).classList.remove('open');}
-document.querySelectorAll('.overlay').forEach(ov=>
-  ov.addEventListener('click',e=>{if(e.target===ov)closeOv(ov.id);})
-);
+document.querySelectorAll('.overlay').forEach(function(ov){
+  ov.addEventListener('click',function(e){if(e.target===ov)closeOv(ov.id);});
+});
 
-/* ── UTILS ── */
+/* UTILS */
 function isLate(emp) {
-  if (emp.data_devolucao) return false;
-  if (emp.previsao) return new Date() > new Date(emp.previsao);
-  return Date.now() - new Date(emp.data_emprestimo).getTime() > HORAS_ALERTA*3600000;
+  if(emp.data_devolucao) return false;
+  if(emp.previsao) return new Date()>new Date(emp.previsao);
+  return Date.now()-new Date(emp.data_emprestimo).getTime()>HORAS_ALERTA*3600000;
 }
-
 function elapsed(iso) {
-  const ms = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(ms/60000);
-  if (min < 60) return min+'min';
-  const h = Math.floor(min/60);
-  return h+'h '+(min%60)+'min';
+  var ms=Date.now()-new Date(iso).getTime(), min=Math.floor(ms/60000);
+  if(min<60) return min+'min';
+  return Math.floor(min/60)+'h '+(min%60)+'min';
 }
-
-function toast(msg, type='ok') {
-  const t = document.getElementById('toast');
+function toast(msg,type) {
+  type=type||'ok';
+  var t=document.getElementById('toast');
   t.textContent=msg; t.className='toast '+type+' show';
-  setTimeout(()=>t.classList.remove('show'),3000);
+  setTimeout(function(){t.classList.remove('show');},3000);
 }
 
-/* ── INIT ── */
+/* INIT */
 carregar();
-setInterval(carregar, 30000);
+setInterval(carregar,30000);
 </script>
 </body>
 </html>
